@@ -1,0 +1,29 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/minix', '.']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/minix']
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'minix'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/minix'
+      - '--region'
+      - 'me-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--cpu'
+      - '2'
+      - '--memory'
+      - '4Gi'
+      - '--min-instances'
+      - '1'
+      - '--no-cpu-throttling'
+      - '--set-env-vars'
+      - 'GEMINI_API_KEY=${_GEMINI_API_KEY}'
+images:
+  - 'gcr.io/$PROJECT_ID/minix'

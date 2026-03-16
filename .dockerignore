@@ -1,0 +1,18 @@
+node_modules
+.env
+.git
+sessions
+*.md
+GeminX-pre-hook
+save-session.py
+*.MOV
+*.mov
+rebuild-video.mov
+dolly.mp4
+dolly-long.mp4
+Audio/
+public/מערכה 3/
+*.log
+create_geminx.py
+build_geminx.py
+config/.claude/

@@ -1,0 +1,16 @@
+.git
+node_modules
+.env
+sessions/
+Audio/
+*.md
+.claude/
+*.MOV
+*.mov
+rebuild-video.mov
+dolly.mp4
+dolly-long.mp4
+*.log
+create_geminx.py
+build_geminx.py
+config/.claude/

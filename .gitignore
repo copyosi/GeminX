@@ -1,0 +1,20 @@
+node_modules/
+.env
+sessions/
+Audio/
+.claude/
+config/.claude/
+.DS_Store
+*.log
+*.MOV
+*.mov
+dolly.mp4
+dolly-long.mp4
+rebuild-video.mov
+create_geminx.py
+build_geminx.py
+save-session.py
+GeminX-pre-hook
+public/מערכה 3/
+public/חומרים סופיים להעלאה להאקטון/
+public/ארכיון/
