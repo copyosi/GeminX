@@ -2,2202 +2,411 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <meta name="viewport"
-    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>GeminiX</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link
-    href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
-    rel="stylesheet">
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Mini — live critique</title>
   <style>
-    *,
-    *::before,
-    *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    /* ═══════════════════════════════════════════════════════════════
+       MINI — a live visual-critique instrument.
+       Gallery black. The work is the only exhibit. One accent: the
+       critique red — an editor's pen, never decoration.
+       Committed single visual world (dark). Deliberate, not an omission.
+    ═══════════════════════════════════════════════════════════════ */
+    :root {
+      --ground:      #0A0A0C;   /* gallery near-black, faintly cool-warm */
+      --ground-mat:  #060607;   /* the mat around the exhibit */
+      --ink:         #F4F2EE;   /* warm off-white */
+      --ink-soft:    #B8B6B0;   /* secondary text */
+      --zinc:        #6E6E76;   /* meta / labels */
+      --zinc-dim:    #45454C;   /* dim labels */
+      --hair:        #232329;   /* hairlines */
+      --red:         #FF362B;   /* critique red — the pen */
+      --red-ink:     #C81E12;   /* label fill */
+      --red-glow:    rgba(255, 54, 43, 0.35);
+
+      --serif: ui-serif, "New York", Georgia, "Times New Roman", serif;
+      --sans:  -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, "Segoe UI", sans-serif;
+      --mono:  ui-monospace, "SF Mono", "Menlo", "Roboto Mono", monospace;
+
+      --safe-t: env(safe-area-inset-top, 0px);
+      --safe-b: env(safe-area-inset-bottom, 0px);
+      --safe-l: env(safe-area-inset-left, 0px);
+      --safe-r: env(safe-area-inset-right, 0px);
+
+      --edge: 22px;
     }
 
-    body {
-      background: #000;
-      color: #fff;
-      font-family: 'Inter', sans-serif;
-      height: 100dvh;
-      width: 100vw;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      width: 100%;
       overflow: hidden;
+      background: var(--ground-mat);
+      color: var(--ink);
+      font-family: var(--sans);
       -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      overscroll-behavior: none;
     }
 
-    ::-webkit-scrollbar {
-      width: 0;
+    ::selection { background: var(--red); color: #fff; }
+
+    button {
+      font: inherit; color: inherit; background: none; border: none;
+      cursor: pointer; -webkit-appearance: none;
+    }
+    button:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+
+    /* ── Stage: the exhibit, matted in black ─────────────────────── */
+    #stage {
+      position: fixed; inset: 0;
+      background: var(--ground-mat);
+      display: grid; place-items: center;
+      overflow: hidden;
     }
 
-    /* ════════════════════════════════════════════
-       FILM GRAIN — cinematic noise overlay
-    ════════════════════════════════════════════ */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
+    /* soft gallery vignette — grounds the mat, no decoration */
+    #stage::after {
+      content: ""; position: absolute; inset: 0; z-index: 4;
       pointer-events: none;
-      opacity: 0.035;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      background-repeat: repeat;
-      background-size: 256px 256px;
-      mix-blend-mode: overlay;
+      background: radial-gradient(130% 120% at 50% 44%, transparent 55%, rgba(0,0,0,0.55) 100%);
     }
 
-    /* ════════════════════════════════════════════
-       UTILITY — glass panels
-    ════════════════════════════════════════════ */
-    .glass-panel {
-      background: rgba(255, 255, 255, 0.03);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    /* Cinematic 16:9 letterbox bars */
-    .letterbox-bar {
-      position: fixed;
-      left: 0;
-      right: 0;
-      height: calc((100vh - 100vw * 9 / 16) / 2);
-      min-height: 0px;
-      background: #000;
-      z-index: 9999;
-      pointer-events: none;
-    }
-    .letterbox-bar.top { top: 0; }
-    .letterbox-bar.bottom { bottom: 0; }
-    /* Timeline timer in bottom letterbox */
-    .timeline-timer {
-      position: fixed;
-      bottom: 10px;
-      right: 20px;
-      font-family: 'Space Mono', monospace;
-      font-size: 36px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      color: rgba(255, 255, 255, 0.6);
-      z-index: 10000;
-      padding: 20px 30px;
-      cursor: pointer;
-    }
-    .timeline-timer.running { color: rgba(255, 255, 255, 0.85); }
-    /* Hide timer in production */
-    .timeline-timer.prod-hidden { display: none !important; }
-
-    .screen {
-      position: fixed;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 1.2s ease;
+    #video {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: contain;              /* whole work shown — a matted print */
+      background: var(--ground-mat);
+      filter: saturate(0.96) brightness(0.94) contrast(1.02);
+      transition: filter 900ms cubic-bezier(.22,.61,.36,1);
       z-index: 1;
     }
+    /* developing pass during a scan */
+    body.state-scanning #video { filter: saturate(0.35) brightness(0.82) contrast(1.06); }
 
-    .screen.active {
-      opacity: 1;
-      pointer-events: all;
-      z-index: 10;
-    }
-
-    /* ════════════════════════════════════════════
-       VOID — Cinematic B&W reveal of the defendant
-    ════════════════════════════════════════════ */
-    #screen-void {
-      background: #000;
-      cursor: pointer;
+    /* ── Critique marks layer (positioned to the video content rect) ── */
+    #marks {
+      position: absolute; z-index: 6; pointer-events: none;
+      /* left/top/width/height set in JS to match the letterboxed video */
     }
 
-    /* ── B&W iPad — the victim reveals itself ── */
-    .void-ipad {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: clamp(280px, 55vw, 500px);
-      max-height: 75vh;
-      object-fit: contain;
-      border-radius: 20px;
-      filter: grayscale(1) brightness(0.18) contrast(1.2);
-      opacity: 0;
-      z-index: 1;
-      transition: opacity 4s cubic-bezier(0.16, 1, 0.3, 1);
-      box-shadow: 0 0 100px rgba(0,0,0,0.9), 0 0 200px rgba(0,0,0,0.5);
-    }
-    .void-ipad.revealed {
-      opacity: 1;
-    }
-    /* Cinematic vignette around the device */
-    .void-vignette {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      pointer-events: none;
-      background: radial-gradient(ellipse 55% 50% at 50% 48%,
-        transparent 0%,
-        rgba(0,0,0,0.4) 45%,
-        rgba(0,0,0,0.92) 100%);
-    }
-
-    /* VOID dots — Mini + Jam as separate elements orbiting on 220px circle */
-    .void-ring {
-      display: none; /* Hidden — title + SHOW US replaced orbit choreography */
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      top: 50%;
-      left: 50%;
-      margin: -5px 0 0 -5px;
-      z-index: 6;
-      pointer-events: none;
-    }
-    .void-ring-mini {
-      background: #A855F7;
-      box-shadow: 0 0 12px rgba(168, 85, 247, 0.6), 0 0 24px rgba(168, 85, 247, 0.3);
-      animation: orbitDot 12s linear infinite;
-    }
-    .void-ring-jam {
-      background: #F59E0B;
-      box-shadow: 0 0 12px rgba(245, 158, 11, 0.6), 0 0 24px rgba(245, 158, 11, 0.3);
-      animation: orbitDot 12s linear infinite;
-      animation-delay: -6s;
-    }
-    @keyframes orbitDot {
-      from { transform: rotate(0deg) translateX(110px); }
-      to { transform: rotate(360deg) translateX(110px); }
-    }
-    /* "hey" text — overlays the B&W iPad */
-    .hook-hey {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-family: 'Inter', sans-serif;
-      font-size: clamp(32px, 5.6vw, 56px);
-      font-weight: 300;
-      letter-spacing: 0.15em;
-      text-indent: 0.2em;
-      color: rgba(255, 255, 255, 0.95);
-      z-index: 5;
-      text-shadow: 0 0 40px rgba(0,0,0,0.9), 0 0 80px rgba(0,0,0,0.5);
-    }
-
-    .greet-tagline {
-      margin-top: 24px;
-      font: 400 13.5px/1 'Space Mono', monospace;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      text-align: center;
-      color: #A855F7;
-      opacity: 0;
-      transition: opacity 1.2s ease;
-    }
-    .greet-tagline.visible { opacity: 1; }
-
-    /* ── Tap hint — hidden until iPad fades in ── */
-    .hook-tap-hint {
-      position: absolute;
-      bottom: 15%;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      font-weight: 400;
-      letter-spacing: 0.4em;
-      text-transform: lowercase;
-      color: rgba(255, 255, 255, 0.15);
-      z-index: 5;
-      opacity: 0;
-      transition: opacity 1.2s ease;
-    }
-    .hook-tap-hint.visible {
-      animation: tapFade 3s ease-in-out infinite;
-    }
-
-    @keyframes tapFade {
-      0%, 100% { opacity: 0.1; }
-      50% { opacity: 0.3; }
-    }
-
-    .hook-tap-hint.hidden { opacity: 0 !important; animation: none; pointer-events: none; }
-
-    .void-status {
-      position: absolute;
-      bottom: calc(40px + env(safe-area-inset-bottom, 0px));
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.15);
-      transition: color 0.5s;
-      z-index: 5;
-    }
-
-    /* ════════════════════════════════════════════
-       GREET — word-by-word intro typography
-    ════════════════════════════════════════════ */
-    .greet-layer {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 8;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.6s ease;
-    }
-
-    .greet-layer.active {
-      opacity: 1;
-      pointer-events: all;
-    }
-
-    .greet-text {
-      font-family: 'Inter', sans-serif;
-      font-size: clamp(30px, 6.5vw, 52px);
-      font-weight: 500;
-      color: rgba(255, 255, 255, 0.95);
-      text-align: center;
-      line-height: 1.25;
-      max-width: 80%;
-      min-height: 60px;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: center;
-      gap: 0 10px;
-      text-shadow: 0 2px 30px rgba(0,0,0,0.8);
-    }
-
-    .greet-word {
-      display: inline-block;
-      opacity: 0;
-      transform: translateY(16px);
-      animation: wordPop 0.7s ease forwards;
-    }
-
-    @keyframes wordPop {
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .greet-cta {
-      margin-top: 36px;
-      font-family: 'Space Mono', monospace;
-      font-size: clamp(12px, 2vw, 16px);
-      font-weight: 700;
-      letter-spacing: 0.4em;
-      color: rgba(255, 255, 255, 0.6);
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      text-decoration: underline;
-      text-underline-offset: 6px;
-      text-decoration-color: rgba(255,255,255,0.12);
-      text-decoration-thickness: 1px;
-      border-radius: 4px;
-      padding: 16px 52px;
-      cursor: pointer;
-      opacity: 0;
-      transform: translateY(8px);
-      transition: opacity 1s ease, transform 1s ease, border-color 0.3s, color 0.3s, background 0.3s;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      text-shadow: 0 1px 10px rgba(0,0,0,0.5);
-    }
-
-    .greet-cta.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .greet-cta::before,
-    .greet-cta::after {
-      content: '';
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-
-    .greet-cta::before {
-      background: #A855F7;
-      box-shadow: 0 0 10px rgba(168, 85, 247, 0.6);
-      animation: ctaPulse 2s ease-in-out infinite;
-    }
-
-    .greet-cta::after {
-      background: #F59E0B;
-      box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
-      animation: ctaPulse 2s ease-in-out infinite 1s;
-    }
-
-    @keyframes ctaPulse {
-      0%, 100% { transform: scale(1); opacity: 0.6; }
-      50% { transform: scale(1.5); opacity: 1; }
-    }
-
-    .greet-cta:hover {
-      color: rgba(255, 255, 255, 0.95);
-      border-color: rgba(255, 255, 255, 0.2);
-      background: rgba(255,255,255,0.06);
-    }
-
-    .greet-cta:active {
-      transform: scale(0.97);
-    }
-
-    /* ════════════════════════════════════════════
-       VOID — GeminiX presents
-    ════════════════════════════════════════════ */
-    .void-presents {
-      font-family: 'Space Mono', monospace;
-      font-size: 26px;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.85);
-      margin-bottom: 16px;
-    }
-    .void-tap-hint {
-      font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.15);
-      margin-top: 32px;
-      animation: tapPulse 2.5s ease-in-out infinite;
-    }
-    @keyframes tapPulse {
-      0%, 100% { opacity: 0.15; }
-      50% { opacity: 0.4; }
-    }
-    .btn-start {
-      display: block;
-      margin: 40px auto 0;
-      padding: 14px 48px;
-      font: 700 14px/1 'Space Mono', monospace;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: #fff;
-      background: transparent;
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.3s ease;
-    }
-    .btn-start:hover { border-color: rgba(255,255,255,0.6); }
-    .btn-start:active { background: rgba(255,255,255,0.1); }
-    .btn-start.hidden { display: none; }
-
-    /* ════════════════════════════════════════════
-       SCENE NAVIGATION BAR
-    ════════════════════════════════════════════ */
-    .scene-nav {
-      position: fixed;
-      top: 0;
-      left: 0; right: 0;
-      z-index: 10001;
-      display: flex;
-      justify-content: center;
-      gap: 0;
-      padding: 10px 0 6px;
-      background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, transparent 100%);
-      pointer-events: auto;
-    }
-    .scene-btn {
-      font: 700 9px/1 'Space Mono', monospace;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.2);
-      background: none;
-      border: none;
-      padding: 8px 20px;
-      cursor: pointer;
-      position: relative;
-      transition: color 0.3s ease;
-    }
-    .scene-btn:hover { color: rgba(255,255,255,0.5); }
-    .scene-btn.active { color: rgba(255,255,255,0.85); }
-    .scene-btn.active::after {
-      content: '';
-      position: absolute;
-      bottom: 0;
-      left: 20%;
-      right: 20%;
-      height: 1px;
-      background: rgba(168,85,247,0.6);
-    }
-    .scene-btn.done { color: rgba(255,255,255,0.35); }
-    .scene-btn.done::before {
-      content: '';
-      position: absolute;
-      left: 6px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 4px; height: 4px;
-      border-radius: 50%;
-      background: rgba(34,197,94,0.5);
-    }
-
-    /* ════════════════════════════════════════════
-       CHAPTER TITLE CARDS
-    ════════════════════════════════════════════ */
-    .chapter-card {
-      position: fixed;
-      inset: 0;
-      z-index: 9000;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      background: #000;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.5s ease;
-    }
-    .chapter-card.visible {
-      opacity: 1;
-      pointer-events: auto;
-    }
-    .chapter-number {
-      font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.3);
-      margin-bottom: 12px;
-    }
-    .chapter-title {
-      font-family: 'Inter', sans-serif;
-      font-size: 36px;
-      font-weight: 200;
-      letter-spacing: 0.15em;
-      color: rgba(255,255,255,0.9);
-    }
-
-    /* ════════════════════════════════════════════
-       SCAN — centered iPad + agent margins
-    ════════════════════════════════════════════ */
-    #screen-scan {
-      background: #000;
-    }
-    /* CRT scanlines — subtle film texture */
-    #screen-scan::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 2px,
-        rgba(0,0,0,0.06) 2px,
-        rgba(0,0,0,0.06) 4px
-      );
-      pointer-events: none;
-      z-index: 46;
-      opacity: 0.4;
-    }
-
-    /* ── Brand watermark — HIDDEN for cinematic mode ── */
-    .scan-brand {
-      position: absolute;
-      top: 12px; left: 50%;
-      transform: translateX(-50%);
-      z-index: 55;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      opacity: 0;
-      transition: opacity 1.5s ease;
-      pointer-events: none;
-    }
-    .scan-brand.visible { opacity: 1; }
-    .scan-brand-text {
-      font: 700 10px/1 'Space Mono', monospace;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.1);
-    }
-    .scan-brand-text span { color: rgba(6,182,212,0.25); }
-    .scan-brand-line {
-      width: 120px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
-    }
-
-    /* ── Viewfinder corner brackets ── */
-    .scan-frame {
-      position: absolute;
-      inset: 0; z-index: 14;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 1.5s ease;
-    }
-    .scan-frame.visible { opacity: 1; }
-    .scan-frame-corner { position: absolute; width: 24px; height: 24px; }
-    .scan-frame-corner::before,
-    .scan-frame-corner::after { content: ''; position: absolute; background: rgba(255,255,255,0.06); transition: background 0.5s ease; }
-    .scan-frame-corner::before { width: 24px; height: 1px; }
-    .scan-frame-corner::after { width: 1px; height: 24px; }
-    .scan-frame-corner.tl { top: 0; left: 0; }
-    .scan-frame-corner.tl::before { top: 0; left: 0; }
-    .scan-frame-corner.tl::after { top: 0; left: 0; }
-    .scan-frame-corner.tr { top: 0; right: 0; }
-    .scan-frame-corner.tr::before { top: 0; right: 0; }
-    .scan-frame-corner.tr::after { top: 0; right: 0; }
-    .scan-frame-corner.bl { bottom: 0; left: 0; }
-    .scan-frame-corner.bl::before { bottom: 0; left: 0; }
-    .scan-frame-corner.bl::after { bottom: 0; left: 0; }
-    .scan-frame-corner.br { bottom: 0; right: 0; }
-    .scan-frame-corner.br::before { bottom: 0; right: 0; }
-    .scan-frame-corner.br::after { bottom: 0; right: 0; }
-
-
-    /* ── Song lyrics — synced to music ── */
-    .lyrics-bar {
-      position: absolute;
-      bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 56;
-      pointer-events: none;
-      text-align: center;
-      max-width: 80%;
-      opacity: 0;
-      transition: opacity 0.5s ease;
-    }
-    .lyrics-bar.visible { opacity: 1; }
-    .lyrics-text {
-      font: 300 clamp(16px, 2.5vw, 22px)/1.5 'Inter', sans-serif;
-      color: rgba(255,255,255,0.7);
-      text-shadow: 0 1px 12px rgba(0,0,0,0.95), 0 0 30px rgba(0,0,0,0.8);
-      letter-spacing: 0.03em;
-      display: inline-block;
-      transition: opacity 0.3s ease;
-    }
-
-    /* ── Netflix-style subtitles ── */
-    .subtitle-bar {
-      position: fixed;
-      bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 200;
-      pointer-events: none;
-      text-align: center;
-      max-width: 80%;
-      opacity: 0;
-      transition: opacity 0.4s ease;
-    }
-    .subtitle-bar.visible { opacity: 1; }
-    .subtitle-speaker {
-      display: none;
-    }
-    .subtitle-text {
-      font: 400 13px/1.6 'Inter', sans-serif;
-      color: rgba(255,255,255,0.92);
-      background: rgba(0,0,0,0.7);
-      padding: 5px 18px;
-      border-radius: 2px;
-      display: inline-block;
-      letter-spacing: 0.01em;
-      max-width: 620px;
-      text-align: center;
-      /* 2 lines max, stable height — no jitter */
-      min-height: 2.6em;
-      overflow: hidden;
-    }
-
-    .scan-capture {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-      border-radius: 0;
-      border: none;
-      box-shadow: none;
-      --ring-x: 50%;
-      --ring-y: 50%;
-      transition: box-shadow 0.8s ease;
-    }
-    /* Colored border glow — disabled for full-bleed cinematic */
-    .scan-capture.agent-mini-active { box-shadow: none; }
-    .scan-capture.agent-jam-active  { box-shadow: none; }
-
-    /* ── Video feed — clean, sharp, full color ── */
-    .scan-feed {
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      overflow: hidden;
-    }
-
-    /* Color ring canvas — reveals original color inside scan ring */
-    #color-ring-canvas {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    /* Video — full color, NO zoom (zoom caused dizziness on iPad) */
-    #screenVideo {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    /* B&W on video feed — ONLY during roast (Chapter 2). Color inside scan ring */
-    body.roast-mode #screenVideo {
-      filter: grayscale(1) brightness(0.7) contrast(1.1);
-    }
-
-    body.camera-mode #screenVideo {
-      object-fit: cover;
-      width: 100%;
-      height: 100%;
-      max-width: none;
-      max-height: none;
-    }
-
-    #annoLayer {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 12;
-    }
-    .anno-circle {
-      position: absolute;
-      width: 80px; height: 80px;
-      border: 3px solid #ef4444;
-      border-radius: 50%;
-      transform: translate(-50%, -50%);
-      animation: annoPulse 1.5s ease-in-out infinite;
-    }
-    .anno-label {
-      position: absolute;
-      top: 90px; left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      color: #ef4444;
-      white-space: nowrap;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    @keyframes annoPulse {
-      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
-      50% { opacity: 0.7; box-shadow: 0 0 20px 8px rgba(239,68,68,0.15); }
-    }
-
-    /* Scan inner rings — only visible during intro */
-    .scan-inner-ring {
-      position: absolute;
-      border-radius: 50%;
-      pointer-events: none;
-      z-index: 9;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      opacity: 0;
-      transition: opacity 0.8s ease;
-    }
-    .scan-capture.intro-scan .scan-inner-ring { opacity: 1; }
-
-    .scan-inner-ring.ring-1 {
-      width: 340px;
-      height: 340px;
-      border: 1px solid rgba(168, 85, 247, 0.06);
-      animation: orbitSpin 20s linear infinite;
-    }
-
-    .scan-inner-ring.ring-2 {
-      width: 380px;
-      height: 380px;
-      border: 1px dashed rgba(168, 85, 247, 0.08);
-      animation: orbitSpin 30s linear infinite reverse;
-    }
-
-    .scan-inner-ring.ring-3 {
-      width: 420px;
-      height: 420px;
-      border: 1px solid rgba(255, 255, 255, 0.03);
-      animation: ringPulse 4s ease-in-out infinite;
-    }
-
-    /* Horizontal scan line — only visible during intro */
-    .scan-line {
-      position: absolute;
-      width: 100%;
-      height: 1px;
-      background: linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.5) 30%, rgba(168, 85, 247, 0.8) 50%, rgba(168, 85, 247, 0.5) 70%, transparent 100%);
-      box-shadow: 0 0 15px rgba(168, 85, 247, 0.4);
-      z-index: 11;
-      pointer-events: none;
-      animation: scanSweep 3s linear infinite;
-    }
-    .roast-mode .scan-line { display: none; }
-
-    @keyframes scanSweep {
-      0% {
-        top: 20%;
-        opacity: 0;
-      }
-
-      10% {
-        opacity: 1;
-      }
-
-      90% {
-        opacity: 1;
-      }
-
-      100% {
-        top: 80%;
-        opacity: 0;
-      }
-    }
-
-    /* The scanning ring — COLOR window — HIDDEN by default */
-    .scan-ring {
-      position: absolute;
-      width: 220px;
-      height: 220px;
-      border-radius: 50%;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%) scale(0.5);
-      z-index: 15;
-      pointer-events: none;
-      border: 2px solid var(--agent-color, rgba(168, 85, 247, 0.6));
-      box-shadow: none;
-      opacity: 0;
-      transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-        top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.6s ease, transform 0.6s ease,
-        border-color 0.4s ease, box-shadow 0.4s ease;
-      overflow: hidden;
-    }
-
-    /* Ring appears when agent is speaking */
-    .scan-ring.active {
-      opacity: 1;
+    /* ── Scan ring: the only theatrical element ──────────────────── */
+    #ring {
+      position: absolute; z-index: 5;
+      left: 50%; top: 50%;
+      width: min(58vmin, 460px); aspect-ratio: 1;
       transform: translate(-50%, -50%) scale(1);
-    }
-
-    /* ── Agent personality on ring movement ── */
-    /* Mini: smooth cinematic glide */
-    .scan-ring.agent-mini {
-      transition: left 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
-        top 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
-        opacity 0.6s ease, transform 0.6s ease,
-        border-color 0.4s ease;
-    }
-    .scan-ring.agent-mini::after {
-      animation: ringPulse 0.8s ease-in-out infinite;
-    }
-    .scan-ring.agent-mini::before {
-      animation: sweep 1.5s linear infinite;
-    }
-
-    /* Jam: slow, calculated, analytical — glides deliberately */
-    .scan-ring.agent-jam {
-      transition: left 1.8s cubic-bezier(0.25, 0.1, 0.25, 1),
-        top 1.8s cubic-bezier(0.25, 0.1, 0.25, 1),
-        opacity 0.8s ease, transform 1s ease,
-        border-color 0.6s ease, box-shadow 0.6s ease;
-    }
-    .scan-ring.agent-jam::after {
-      animation: ringPulse 4s ease-in-out infinite;
-    }
-    .scan-ring.agent-jam::before {
-      animation: sweep 6s linear infinite;
-    }
-
-    /* Radar sweep inside the circle — conic gradient */
-    .scan-ring::before {
-      content: '';
-      position: absolute;
-      inset: -1px;
-      border-radius: 50%;
-      background: conic-gradient(from 0deg,
-          transparent 0deg,
-          transparent 260deg,
-          var(--agent-glow, rgba(168, 85, 247, 0.1)) 320deg,
-          rgba(255, 255, 255, 0.3) 360deg);
-      animation: sweep 3s linear infinite;
-    }
-
-    .scan-ring::after {
-      content: '';
-      position: absolute;
-      inset: -4px;
-      border-radius: 50%;
-      border: 1px solid rgba(168, 85, 247, 0.06);
-      animation: ringPulse 2s ease-in-out infinite;
-    }
-
-    @keyframes sweep { to { transform: rotate(360deg); } }
-    @keyframes ringPulse { 0%, 100% { opacity: .3 } 50% { opacity: 1 } }
-
-    /* Data readout panels — HIDDEN for cinematic mode */
-    .scan-data {
-      display: none !important;
-    }
-
-    .scan-data-left {
-      left: calc(24px + env(safe-area-inset-left, 0px));
-      top: 50%;
-      transform: translateY(-50%);
-      border-left: 1px solid rgba(255, 255, 255, 0.06);
-      padding-left: 12px;
-    }
-
-    .scan-data-right {
-      right: calc(24px + env(safe-area-inset-right, 0px));
-      top: 50%;
-      transform: translateY(-50%);
-      text-align: right;
-      border-right: 1px solid rgba(255, 255, 255, 0.06);
-      padding-right: 12px;
-    }
-
-    .scan-data-item {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .scan-data-label {
-      font-size: 8px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.25);
-    }
-
-    .scan-data-value {
-      font-size: 10px;
-      letter-spacing: 1px;
-      color: rgba(255, 255, 255, 0.4);
-    }
-
-    .scan-data-value.live {
-      color: rgba(168, 85, 247, 0.7);
-    }
-
-    .scan-data-value.ok {
-      color: rgba(34, 197, 94, 0.5);
-    }
-
-    /* Hide HUD chrome once roast begins — keep screen clean */
-    #screen-scan.roasting .scan-data,
-    #screen-scan.roasting .scan-inner-ring,
-    #screen-scan.roasting .scan-line,
-    #screen-scan.roasting .round {
       opacity: 0;
-      transition: opacity 0.8s ease;
+      transition: opacity 700ms ease, transform 900ms cubic-bezier(.22,.61,.36,1);
       pointer-events: none;
     }
+    body.state-scanning #ring,
+    body.state-live #ring { opacity: 1; }
+    body.state-scanning #ring { animation: lockon 1600ms cubic-bezier(.22,.61,.36,1) both; }
+    @keyframes lockon {
+      0%   { transform: translate(-50%,-50%) scale(1.35); opacity: 0; }
+      35%  { opacity: 1; }
+      100% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    }
+    #ring .ring-rot { position: absolute; inset: 0; animation: spin 14s linear infinite; }
+    body.reduced #ring .ring-rot { animation: none; }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Agent dots — small glowing circles that follow the scan ring */
-    .scan-dot {
-      position: absolute;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      z-index: 20;
+    #ring svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .ring-track { fill: none; stroke: rgba(244,242,238,0.14); stroke-width: 1; }
+    .ring-ticks { stroke: rgba(244,242,238,0.28); stroke-width: 1; }
+    .ring-sweep {
+      fill: none; stroke: var(--red); stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-dasharray: 60 244; stroke-dashoffset: 0;
+      filter: drop-shadow(0 0 4px var(--red-glow));
+      animation: sweep 3.2s linear infinite;
+    }
+    body.reduced .ring-sweep { animation: none; stroke-dasharray: 304; }
+    @keyframes sweep { to { stroke-dashoffset: -304; } }
+
+    /* viewfinder brackets */
+    .bracket { position: absolute; width: 20px; height: 20px; border: 1.5px solid rgba(244,242,238,0.4); }
+    .bk-tl { left: -8px; top: -8px; border-right: none; border-bottom: none; }
+    .bk-tr { right: -8px; top: -8px; border-left: none; border-bottom: none; }
+    .bk-bl { left: -8px; bottom: -8px; border-right: none; border-top: none; }
+    .bk-br { right: -8px; bottom: -8px; border-left: none; border-top: none; }
+
+    /* ── Exhibit placard (top-left) ──────────────────────────────── */
+    #placard {
+      position: fixed; z-index: 20;
+      top: calc(var(--safe-t) + var(--edge));
+      left: calc(var(--safe-l) + var(--edge));
+      display: flex; flex-direction: column; gap: 4px;
       pointer-events: none;
-      transform: translate(-50%, -50%);
-      display: none;
     }
-    .roast-mode .scan-dot.jam,
-    .roast-mode .scan-dot.mini {
-      display: block;
+    .wordmark {
+      font-family: var(--serif);
+      font-size: 30px; font-weight: 500; font-style: italic;
+      letter-spacing: 0.01em; line-height: 1;
+      color: var(--ink);
     }
-    .scan-dot.jam {
-      transition: all 1s cubic-bezier(0.25, 0.1, 0.25, 1);
-    }
-    /* Jam slide animation — travels to pipeline icons */
-    .scan-dot.jam.jam-sliding {
-      transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 50;
-    }
-    .scan-dot.jam.jam-arrived {
-      animation: jamPulseGlow 0.6s ease-in-out 2;
-    }
-    @keyframes jamPulseGlow {
-      0%, 100% { box-shadow: 0 0 20px rgba(245,158,11,0.6), 0 0 50px rgba(245,158,11,0.2); transform: scale(1); }
-      50% { box-shadow: 0 0 30px rgba(245,158,11,0.9), 0 0 70px rgba(245,158,11,0.4); transform: scale(1.5); }
-    }
-    /* Mini dot: smooth cinematic movement */
-    .scan-dot.mini {
-      transition: left 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
-                  top 1.2s cubic-bezier(0.25, 0.1, 0.25, 1),
-                  opacity 0.4s;
+    .medium {
+      font-family: var(--mono);
+      font-size: 10.5px; letter-spacing: 0.28em; text-transform: uppercase;
+      color: var(--zinc);
     }
 
-    /* Agent glow halo */
-    .scan-dot::after {
-      content: '';
-      position: absolute;
-      inset: -6px;
-      border-radius: 50%;
-      background: inherit;
-      filter: blur(10px);
-      opacity: 0.6;
+    /* ── Status (top-right) ──────────────────────────────────────── */
+    #status {
+      position: fixed; z-index: 20;
+      top: calc(var(--safe-t) + var(--edge));
+      right: calc(var(--safe-r) + var(--edge));
+      display: flex; align-items: center; gap: 8px;
+      font-family: var(--mono);
+      font-size: 10.5px; letter-spacing: 0.24em; text-transform: uppercase;
+      color: var(--zinc);
     }
-
-    .scan-dot.mini {
-      background: #A855F7;
-      box-shadow: 0 0 20px rgba(168, 85, 247, 0.6), 0 0 50px rgba(168, 85, 247, 0.2);
-      left: 8%;
-      top: 40%;
-      animation: heartbeat 2.5s ease-in-out infinite;
+    #live-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--zinc-dim);
+      transition: background 300ms ease, box-shadow 300ms ease;
     }
-
-    .scan-dot.jam {
-      background: #F59E0B;
-      box-shadow: 0 0 20px rgba(245, 158, 11, 0.6), 0 0 50px rgba(245, 158, 11, 0.2);
-      left: 92%;
-      top: 60%;
-      animation: heartbeat 2.5s ease-in-out 1.2s infinite;
+    body.mic-live #live-dot {
+      background: var(--red);
+      box-shadow: 0 0 0 0 var(--red-glow);
+      animation: pulse 1.9s ease-out infinite;
     }
-
-    .scan-dot.speaking {
-      animation: heartbeat 0.6s ease-in-out infinite !important;
-    }
-
-    @keyframes heartbeat {
-
-      0%,
-      100% {
-        transform: scale(1);
-      }
-
-      15% {
-        transform: scale(1.5);
-      }
-
-      30% {
-        transform: scale(1);
-      }
-
-      45% {
-        transform: scale(1.3);
-      }
-
-      60% {
-        transform: scale(1);
-      }
-    }
-
-    /* Glow strips */
-    .glow {
-      display: none !important;
-    }
-
-    .glow-l {
-      left: 0;
-      width: 80px;
-      background: linear-gradient(to right, rgba(168, 85, 247, 0.3), rgba(168,85,247,0.08) 40%, transparent);
-    }
-
-    .glow-r {
-      right: 0;
-      width: 80px;
-      background: linear-gradient(to left, rgba(245, 158, 11, 0.3), rgba(245,158,11,0.08) 40%, transparent);
-    }
-
-    .glow.on {
-      opacity: 1;
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
+    body.reduced #live-dot { animation: none; }
     @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: .4
-      }
-
-      50% {
-        opacity: 1
-      }
+      0%   { box-shadow: 0 0 0 0 var(--red-glow); }
+      70%  { box-shadow: 0 0 0 8px rgba(255,54,43,0); }
+      100% { box-shadow: 0 0 0 0 rgba(255,54,43,0); }
     }
 
-    /* Transcript — hidden for clean look */
-    .transcript {
-      display: none;
+    /* ── Verdict: score + worst area (gallery placard, appears on scan) ── */
+    #verdict {
+      position: fixed; z-index: 18;
+      right: calc(var(--safe-r) + var(--edge));
+      bottom: calc(var(--safe-b) + 120px);
+      text-align: right;
+      opacity: 0; transform: translateY(8px);
+      transition: opacity 600ms ease, transform 600ms ease;
+      pointer-events: none;
+    }
+    body.has-verdict #verdict { opacity: 1; transform: none; }
+    .score {
+      font-family: var(--serif); font-weight: 500;
+      font-size: 58px; line-height: 0.85; color: var(--ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .score .over { color: var(--zinc); font-size: 26px; }
+    #worst {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: var(--red);
+      margin-top: 8px;
     }
 
-    .t-line {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      animation: fadeUp 0.25s ease both;
+    /* ── Mode picker ─────────────────────────────────────────────── */
+    #modes {
+      position: fixed; z-index: 22;
+      left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--safe-b) + 92px);
+      display: flex; gap: 4px;
+      padding: 4px; border: 1px solid var(--hair); border-radius: 2px;
+      background: rgba(10,10,12,0.55);
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      transition: opacity 400ms ease;
     }
-
-    .t-sparkle {
-      width: 14px;
-      height: 14px;
-      flex-shrink: 0;
+    #modes button {
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.2em;
+      text-transform: uppercase; color: var(--zinc);
+      padding: 8px 15px; border-radius: 1px;
+      min-height: 34px;
+      transition: color 200ms ease, background 200ms ease;
     }
+    #modes button[aria-pressed="true"] { color: var(--ink); background: rgba(244,242,238,0.07); }
+    #modes button:active { color: var(--ink); }
+    /* mode picker recedes once the critique is live */
+    body.state-live #modes, body.state-rebuilding #modes, body.state-reveal #modes { opacity: 0; pointer-events: none; }
 
-    .t-sparkle.glow-anim {
-      animation: sparkGlow 2s ease-in-out infinite;
-    }
-
-    @keyframes sparkGlow {
-
-      0%,
-      100% {
-        opacity: .6;
-        filter: drop-shadow(0 0 2px currentColor);
-      }
-
-      50% {
-        opacity: 1;
-        filter: drop-shadow(0 0 8px currentColor);
-      }
-    }
-
-    .t-name {
-      font-family: 'Space Mono', monospace;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      flex-shrink: 0;
-    }
-
-    .t-text {
-      color: rgba(255, 255, 255, 0.88);
-      font-size: 15px;
-      font-weight: 300;
-      line-height: 1.5;
-      text-shadow: 0 1px 10px rgba(0, 0, 0, 0.9);
-    }
-
-    .t-line.streaming .t-text::after {
-      content: '\25CB';
-      margin-left: 3px;
-      color: rgba(255, 255, 255, 0.2);
-      animation: blink 0.9s steps(1) infinite;
-    }
-
-    .t-line.mini .t-name,
-    .t-line.mini .t-sparkle {
-      color: #C084FC;
-    }
-
-    .t-line.jam .t-name,
-    .t-line.jam .t-sparkle {
-      color: #FBBF24;
-    }
-
-    .t-line.defendant .t-name,
-    .t-line.defendant .t-sparkle {
-      color: #E2E8F0;
-    }
-
-    @keyframes fadeUp {
-      from {
-        opacity: 0;
-        transform: translateY(4px)
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0)
-      }
-    }
-
-    @keyframes blink {
-
-      0%,
-      100% {
-        opacity: 1
-      }
-
-      50% {
-        opacity: 0
-      }
-    }
-
-    .round {
-      position: fixed;
-      top: calc(16px + env(safe-area-inset-top, 0px));
-      right: calc(20px + env(safe-area-inset-right, 0px));
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      color: rgba(255, 255, 255, 0.25);
-      z-index: 50;
-      opacity: 0;
-      transition: opacity 0.3s;
-      background: rgba(0,0,0,0.5);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,0.06);
-      padding: 5px 14px;
-      border-radius: 20px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
-    }
-
-    .round.on {
-      opacity: 1;
-    }
-
-    /* ════════════════════════════════════════════
-       ORCHESTRATION LOG — glass terminal
-    ════════════════════════════════════════════ */
-    .orch-log {
-      display: none;
-    }
-    .orch-log.visible { opacity: 1; }
-    .orch-log-header {
-      font: 700 7px/1 'Space Mono', monospace;
-      color: rgba(34,197,94,0.6);
+    /* ── Subtitles: cinematic, bottom, max 2 lines ───────────────── */
+    #subtitles {
+      position: fixed; z-index: 19;
+      left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--safe-b) + 92px);
+      width: min(760px, 88vw);
       text-align: center;
-      padding: 6px 0 2px;
-      letter-spacing: 2px;
+      opacity: 0; transition: opacity 320ms ease;
+    }
+    #subtitles.visible { opacity: 1; }
+    #subtitle-text {
+      display: inline; /* so the ink-box hugs the text */
+      font-family: var(--sans);
+      font-size: clamp(18px, 2.5vmin, 24px);
+      font-weight: 550; line-height: 1.42;
+      color: #fff;
+      background: rgba(6,6,7,0.62);
+      box-decoration-break: clone; -webkit-box-decoration-break: clone;
+      padding: 3px 10px;
+      text-shadow: 0 1px 10px rgba(0,0,0,0.9);
+      /* clamp to 2 lines */
+      -webkit-line-clamp: 2; line-clamp: 2;
+    }
+    #subtitles[dir="rtl"] #subtitle-text { direction: rtl; }
+
+    /* ── Actions ─────────────────────────────────────────────────── */
+    #actions {
+      position: fixed; z-index: 22;
+      left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--safe-b) + 26px);
+      display: flex; gap: 12px; align-items: center;
+    }
+    .btn {
+      font-family: var(--mono); font-size: 12px; letter-spacing: 0.2em;
       text-transform: uppercase;
+      min-height: 48px; padding: 0 30px;
+      display: inline-flex; align-items: center; gap: 10px;
+      border: 1px solid var(--ink); color: var(--ink);
+      border-radius: 2px;
+      background: rgba(10,10,12,0.4);
+      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+      transition: background 200ms ease, color 200ms ease, border-color 200ms ease, opacity 300ms ease;
     }
-    .orch-log-body {
-      padding: 2px 10px 6px;
-      background: none;
-      border: none;
-      overflow: hidden;
-      max-height: 138px;
+    .btn:active { background: var(--ink); color: var(--ground); }
+    .btn-primary { border-color: var(--red); color: var(--ink); }
+    .btn-primary::before {
+      content: ""; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red); box-shadow: 0 0 8px var(--red-glow);
     }
-    .orch-log-line {
-      font: 400 7px/1.5 'Space Mono', monospace;
-      white-space: nowrap;
-      color: rgba(34,197,94,0.7);
-      animation: logFadeIn 0.3s ease;
-    }
-    .orch-log-line .log-ts  { color: rgba(34,197,94,0.3); }
-    .orch-log-line .log-tag { font-weight: 700; }
-    .orch-log-line.vision  { color: rgba(96,165,250,0.7); }
-    .orch-log-line.mini    { color: rgba(168,85,247,0.7); }
-    .orch-log-line.jam     { color: rgba(245,158,11,0.7); }
-    .orch-log-line.cut     { color: rgba(239,68,68,0.7); }
-    .orch-log-line.build   { color: rgba(34,197,94,0.9); }
-    .orch-log-line.phase   { color: rgba(255,255,255,0.5); }
-    @keyframes logFadeIn {
-      from { opacity: 0; transform: translateX(-4px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
+    .btn-primary:active { background: var(--red); color: #fff; }
+    .btn-ghost { border-color: var(--hair); color: var(--zinc); }
+    .btn[hidden] { display: none; }
 
-    /* ════════════════════════════════════════════
-       PIPELINE — 3 circles on right side
-    ════════════════════════════════════════════ */
-    .pipeline {
-      position: absolute;
-      right: clamp(16px, 3vw, 40px);
-      top: 50%;
-      transform: translateY(-50%);
-      z-index: 45;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.8s ease;
+    /* ── Before / After reveal — full-bleed, minimal handle ──────── */
+    #reveal {
+      position: fixed; inset: 0; z-index: 30;
+      background: var(--ground-mat);
+      display: none; place-items: center;
     }
-    .pipeline.visible { opacity: 1; }
-
-    .pipe-node {
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.1);
-      background: rgba(0,0,0,0.5);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      transition: border-color 0.6s ease, box-shadow 0.6s ease;
-    }
-    .pipe-node svg {
-      width: 16px;
-      height: 16px;
-      opacity: 0.3;
-      transition: opacity 0.6s ease;
-    }
-    .pipe-node.active {
-      border-color: rgba(255,255,255,0.25);
-      box-shadow: 0 0 12px rgba(255,255,255,0.06);
-    }
-    .pipe-node.active svg { opacity: 0.7; }
-
-    /* Connector line between nodes */
-    .pipe-line {
-      width: 1px;
-      height: 24px;
-      background: rgba(255,255,255,0.06);
-      position: relative;
-    }
-    .pipe-line::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0;
-      width: 1px;
-      height: 0%;
-      background: rgba(255,255,255,0.25);
-      transition: height 0.8s ease;
-    }
-    .pipe-line.flowing::after { height: 100%; }
-
-    /* Node label — tiny text below */
-    .pipe-label {
-      font: 600 6px/1 'Space Mono', monospace;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.15);
-      margin-top: 3px;
-      margin-bottom: 8px;
-      transition: color 0.6s ease;
-    }
-    .pipe-node.active + .pipe-label,
-    .pipe-node.active ~ .pipe-label { color: rgba(255,255,255,0.35); }
-
-    /* ════════════════════════════════════════════
-       REBUILD — grid + glass + before/after
-    ════════════════════════════════════════════ */
-    #screen-rebuild {
-      overflow: hidden;
-      perspective: 1000px;
-    }
-
-    /* Grid background */
-    .rebuild-grid {
-      position: absolute;
-      inset: -20%;
-      background-size: 60px 60px;
-      background-image:
-        linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-        linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-      transform: rotateX(55deg) scale(1.5);
-      opacity: 0.6;
-      pointer-events: none;
-      animation: gridDrift 30s linear infinite;
-    }
-
-    @keyframes gridDrift {
-      0% {
-        background-position: 0 0;
-      }
-
-      100% {
-        background-position: 60px 60px;
-      }
-    }
-
-    /* REBUILD — Video plays first */
-    .rebuild-video {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #000;
-      z-index: 5;
-    }
-    .rebuild-video.done {
-      display: none;
-    }
-
-    /* REBUILD — Cinematic Before/After Slider */
-    .rebuild-compare {
-      position: absolute;
-      inset: 0;
-      z-index: 2;
-      overflow: hidden;
-      --slider-pos: 50%;
-    }
-
-    .compare-layer {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .compare-layer img {
-      width: 70%;
-      height: 70%;
-      object-fit: contain;
-    }
-
-    .compare-layer iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
-    }
-
-    .compare-before {
-      z-index: 3;
-      clip-path: inset(0 calc(100% - var(--slider-pos)) 0 0);
-    }
-
-    .compare-before img {
-      opacity: 1;
-    }
-
-    .compare-after {
-      z-index: 2;
-    }
-
-    .compare-after img.generated {
-      opacity: 1;
-    }
-
-    /* Slider handle */
-    .compare-handle {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: var(--slider-pos);
-      transform: translateX(-50%);
-      z-index: 5;
-      display: flex;
-      align-items: center;
-      cursor: ew-resize;
+    #reveal.on { display: grid; }
+    .rv-pane { position: absolute; inset: 0; display: grid; place-items: center; }
+    .rv-pane img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+    #rv-before { clip-path: inset(0 calc(100% - var(--pos, 50%)) 0 0); z-index: 2; }
+    #rv-after  { z-index: 1; }
+    #rv-handle {
+      position: absolute; z-index: 3; top: 0; bottom: 0;
+      left: var(--pos, 50%); width: 2px; margin-left: -1px;
+      background: var(--ink);
       touch-action: none;
     }
-
-    .compare-line {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 50%;
-      width: 1px;
-      transform: translateX(-50%);
-      background: linear-gradient(to bottom,
-          transparent,
-          rgba(168, 85, 247, 0.2) 15%,
-          rgba(168, 85, 247, 0.35) 50%,
-          rgba(168, 85, 247, 0.2) 85%,
-          transparent);
-    }
-
-    .compare-knob {
-      position: relative;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      background: rgba(11, 13, 16, 0.7);
-      border: 1px solid rgba(168, 85, 247, 0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 0 12px rgba(168, 85, 247, 0.1);
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-
-    .compare-knob:hover,
-    .compare-handle:active .compare-knob {
-      border-color: rgba(168, 85, 247, 0.5);
-      box-shadow: 0 0 16px rgba(168, 85, 247, 0.2);
-    }
-
-    .compare-label {
-      position: absolute;
-      bottom: -28px;
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      z-index: 4;
-      transition: opacity 0.3s;
-      padding: 4px 10px;
-      border-radius: 3px;
-    }
-
-    .compare-label-before {
-      left: 0;
-      color: rgba(239, 68, 68, 0.7);
-      background: rgba(239, 68, 68, 0.08);
-      border: 1px solid rgba(239, 68, 68, 0.2);
-    }
-
-    .compare-label-after {
-      right: 0;
-      color: rgba(168, 85, 247, 0.8);
-      background: rgba(168, 85, 247, 0.08);
-      border: 1px solid rgba(168, 85, 247, 0.25);
-    }
-
-    /* Building progress bar */
-    .rebuild-progress {
-      position: absolute;
-      bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-      left: 50%;
-      transform: translateX(-50%);
-      text-align: center;
-      width: 200px;
-      z-index: 10;
-      opacity: 0;
-      transition: opacity 0.5s;
-    }
-
-    .rebuild-progress.active {
-      opacity: 1;
-    }
-
-    .rebuild-progress-label {
-      font-size: 9px;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.2);
-      font-family: 'Space Mono', monospace;
-      margin-bottom: 8px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    .rebuild-progress-bar {
-      width: 100%;
-      height: 2px;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 1px;
-      overflow: hidden;
-    }
-
-    .rebuild-progress-fill {
-      height: 100%;
-      width: 33%;
-      background: linear-gradient(90deg, #A855F7, #fff);
-      border-radius: 1px;
-      animation: progressSlide 2s ease-in-out infinite;
-    }
-
-    @keyframes progressSlide {
-      0% {
-        transform: translateX(-100%);
-      }
-
-      100% {
-        transform: translateX(400%);
-      }
-    }
-
-    /* Agent dots magnetizing on rebuild — hidden during slider */
-    .rebuild-agent {
-      display: none;
-      position: absolute;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      z-index: 5;
-      pointer-events: none;
-      mix-blend-mode: screen;
-    }
-
-    .rebuild-agent.mini {
-      top: 30%;
-      left: 20%;
-      background: #A855F7;
-      box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);
-      animation: magnetize 3s ease-in-out infinite;
-    }
-
-    .rebuild-agent.jam {
-      bottom: 30%;
-      right: 20%;
-      background: #F59E0B;
-      box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
-      animation: magnetize 3s ease-in-out infinite 1.5s;
-    }
-
-    @keyframes magnetize {
-
-      0%,
-      100% {
-        transform: scale(1);
-        opacity: 0.3;
-      }
-
-      50% {
-        transform: scale(1.8);
-        opacity: 0.7;
-      }
-    }
-
-    /* ════════════════════════════════════════════
-       CURTAIN — credits
-    ════════════════════════════════════════════ */
-    #screen-curtain {
-      overflow: hidden;
-    }
-    /* Burnt iPad background image */
-    .burnt-ipad-bg {
-      position: absolute;
-      top: 50%;
-      left: 50%;
+    #rv-handle::after {
+      content: ""; position: absolute; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      max-width: 70%;
-      max-height: 70%;
-      object-fit: contain;
-      opacity: 0.15;
-      pointer-events: none;
-      z-index: 1;
+      width: 40px; height: 40px; border-radius: 50%;
+      border: 1.5px solid var(--ink); background: rgba(6,6,7,0.5);
+      backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
     }
+    #rv-handle::before {
+      content: "‹ ›"; position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%); z-index: 1;
+      font: 13px var(--mono); letter-spacing: 2px; color: var(--ink);
+    }
+    .rv-label {
+      position: absolute; z-index: 4; bottom: calc(var(--safe-b) + 22px);
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.26em;
+      text-transform: uppercase; color: var(--ink);
+      background: rgba(6,6,7,0.6); padding: 5px 10px; border-radius: 2px;
+    }
+    .rv-before-label { left: calc(var(--safe-l) + var(--edge)); }
+    .rv-after-label  { right: calc(var(--safe-r) + var(--edge)); color: var(--red); }
 
-    .credits-video {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      background: #000;
+    /* ── Idle hint ───────────────────────────────────────────────── */
+    #hint {
+      position: fixed; z-index: 17; left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--safe-b) + 148px);
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.24em;
+      text-transform: uppercase; color: var(--zinc-dim);
+      transition: opacity 400ms ease;
     }
+    body:not(.state-idle) #hint { opacity: 0; }
 
-    /* Credits lyrics overlay — cinema style */
-    .credits-lyrics {
-      position: absolute;
-      bottom: 12%;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      font: 300 15px/1.8 'Inter', sans-serif;
-      color: rgba(255,255,255,0.88);
-      background: rgba(0,0,0,0.65);
-      padding: 8px 24px;
-      border-radius: 3px;
-      text-align: center;
-      max-width: 650px;
-      opacity: 0;
-      transition: opacity 0.6s ease;
-      pointer-events: none;
-    }
-    .credits-lyrics.visible {
-      opacity: 1;
-    }
+    /* offscreen capture canvas */
+    #cap { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; left: -9999px; }
 
-    .credits-roll {
-      position: absolute;
-      inset: 0;
-      overflow: hidden;
-      z-index: 5;
-      display: none;
-    }
-    .credits-roll.active {
-      display: block;
-    }
-    .credits-roll-inner {
-      position: absolute;
-      width: 100%;
-      text-align: center;
-      padding: 0 40px;
-      top: 100%;
-      animation: credits-scroll 25s linear forwards;
-    }
-    @keyframes credits-scroll {
-      0%   { top: 100%; }
-      100% { top: -120%; }
-    }
-    .credits-roll h1 {
-      font-family: 'Inter', sans-serif;
-      font-size: clamp(40px, 8vw, 72px);
-      font-weight: 200;
-      letter-spacing: 0.45em;
-      color: rgba(255, 255, 255, 0.25);
-      margin-bottom: 60px;
-      text-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
-    }
-    .credits-roll h1 span {
-      color: rgba(6, 182, 212, 0.5);
-      font-weight: 300;
-    }
-    .credits-logo {
-      width: clamp(180px, 40vw, 320px);
-      margin-bottom: 20px;
-    }
-    .credit-block {
-      margin-bottom: 35px;
-    }
-    .credit-block small {
-      display: block;
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, 0.25);
-      margin-bottom: 6px;
-    }
-    .credit-block p {
-      font-size: 20px;
-      color: rgba(255, 255, 255, 1);
-      font-weight: 700;
-    }
-    .credit-block em {
-      font-size: 13px;
-      color: rgba(255, 255, 255, 0.3);
-    }
-    .credits {
-      position: absolute;
-      width: 100%;
-      text-align: center;
-      padding: 0 40px;
-      animation: roll 30s linear forwards;
-      animation-play-state: paused;
-      display: none;
-    }
-
-    #screen-curtain.active .credits {
-      animation-play-state: running;
-    }
-
-    .credits h1 {
-      font-family: 'Inter', sans-serif;
-      font-size: clamp(40px, 8vw, 72px);
-      font-weight: 200;
-      letter-spacing: 0.45em;
-      color: rgba(255, 255, 255, 0.25);
-      margin-bottom: 60px;
-      text-shadow: 0 0 40px rgba(255, 255, 255, 0.1), 0 0 80px rgba(6,182,212,0.05);
-    }
-
-    .credits h1 span {
-      color: rgba(6, 182, 212, 0.5);
-      font-weight: 300;
-    }
-
-    .credits p {
-      font-size: 16px;
-      color: rgba(255, 255, 255, .5);
-      margin-bottom: 4px;
-      font-weight: 300;
-    }
-
-    .credits small {
-      display: block;
-      font-family: 'Space Mono', monospace;
-      font-size: 9px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(255, 255, 255, .1);
-      margin-bottom: 40px;
-    }
-
-    .credits em {
-      display: block;
-      font-size: 14px;
-      color: rgba(255, 255, 255, .15);
-      margin-top: 50px;
-      line-height: 2;
-      font-weight: 300;
-    }
-
-    /* Credit section dividers */
-    .credit-divider {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 16px;
-      margin: 48px 0 28px;
-      opacity: 0.35;
-    }
-    .credit-divider-line {
-      width: 40px;
-      height: 1px;
-      background: rgba(255,255,255,0.5);
-    }
-    .credit-divider-text {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 4px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.8);
-    }
-
-    /* Credit metrics */
-    .credit-metrics {
-      display: flex;
-      justify-content: center;
-      gap: 48px;
-      margin-top: 16px;
-    }
-    .credit-metric {
-      text-align: center;
-    }
-    .credit-metric-value {
-      font-family: 'Space Mono', monospace;
-      font-size: 28px;
-      font-weight: 700;
-      color: rgba(168, 85, 247, 0.5);
-    }
-    .credit-metric-label {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.15);
-      margin-top: 4px;
-    }
-
-    /* End mark */
-    .credit-end-mark {
-      margin-top: 60px;
-    }
-    .credit-end-dot {
-      width: 3px;
-      height: 3px;
-      background: rgba(255,255,255,0.3);
-      border-radius: 50%;
-      margin: 0 auto 12px;
-    }
-    .credit-end-text {
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.08);
-    }
-
-    @keyframes roll {
-      0% {
-        transform: translateY(100vh)
-      }
-
-      100% {
-        transform: translateY(-100%)
-      }
-    }
-
-    /* ════════════════════════════════════════════
-       ANNOTATIONS
-    ════════════════════════════════════════════ */
-    .anno {
-      position: absolute;
-      pointer-events: none;
-      z-index: 14;
-    }
-
-    .anno-circle {
-      border: 2.5px solid var(--c);
-      border-radius: 50%;
-    }
-
-    .anno-arrow::after {
-      content: '\25BC';
-      color: var(--c);
-      position: absolute;
-      bottom: -16px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 12px;
-    }
-
-    .anno-highlight {
-      border: 2px dashed var(--c);
-      border-radius: 3px;
-      background: color-mix(in srgb, var(--c) 8%, transparent);
-    }
-
-    .anno-strikethrough {
-      height: 3px;
-      background: var(--c);
-      border-radius: 2px;
-      min-width: 50px;
-    }
-
-    .size-small {
-      width: 38px;
-      height: 38px;
-    }
-
-    .size-medium {
-      width: 62px;
-      height: 62px;
-    }
-
-    .size-large {
-      width: 94px;
-      height: 94px;
-    }
-
-    .anno-pulse {
-      animation: annoPulse 1.6s ease-in-out infinite;
-    }
-
-    @keyframes annoPulse {
-
-      0%,
-      100% {
-        box-shadow: 0 0 6px var(--c)
-      }
-
-      50% {
-        box-shadow: 0 0 20px var(--c)
-      }
-    }
-
-    @keyframes pulse-soft {
-      0%, 100% { opacity: 0.85; transform: translateX(-50%) scale(1); }
-      50% { opacity: 1; transform: translateX(-50%) scale(1.04); }
-    }
-    @keyframes fadeSlideIn {
-      from { opacity: 0; transform: translateY(-6px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes scanPinDrop {
-      0%   { opacity: 0; transform: translate(-50%,-50%) scale(0); }
-      60%  { opacity: 1; transform: translate(-50%,-50%) scale(1.2); }
-      100% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
-    }
-    @keyframes scanPinIdle {
-      0%, 100% { box-shadow: 0 0 6px currentColor; }
-      50%      { box-shadow: 0 0 14px currentColor; }
-    }
-    @keyframes scanLineReveal {
-      from { width: 0; opacity: 0; }
-      to   { width: 40px; opacity: 1; }
-    }
-    @keyframes scanFadeSettle {
-      0%   { opacity: 1; }
-      100% { opacity: 0.35; }
-    }
-
-    .anno-label {
-      position: absolute;
-      top: -18px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-family: 'Space Mono', monospace;
-      font-size: 8px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      white-space: nowrap;
-      text-transform: uppercase;
-      color: var(--c);
-      background: rgba(0, 0, 0, .85);
-      padding: 2px 5px;
-      border-radius: 3px;
+    @media (prefers-reduced-motion: reduce) {
+      #video { transition: none; }
+      #ring { animation: none !important; }
     }
   </style>
 </head>
 
-<body>
-
-  <!-- Cinematic 16:9 letterbox -->
-  <div class="letterbox-bar top"></div>
-  <div class="letterbox-bar bottom"></div>
-
-  <!-- Netflix subtitles — global, all screens -->
-  <div id="subtitle-bar" class="subtitle-bar">
-    <span id="subtitle-text" class="subtitle-text"></span>
+<body class="state-idle" data-mode="print">
+  <div id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <div id="marks"></div>
+    <div id="ring">
+      <div class="ring-rot">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <circle class="ring-track" cx="50" cy="50" r="47" />
+          <circle class="ring-sweep" cx="50" cy="50" r="47" />
+          <g class="ring-ticks">
+            <line x1="50" y1="1" x2="50" y2="6" />
+            <line x1="50" y1="94" x2="50" y2="99" />
+            <line x1="1" y1="50" x2="6" y2="50" />
+            <line x1="94" y1="50" x2="99" y2="50" />
+          </g>
+        </svg>
+      </div>
+      <span class="bracket bk-tl"></span>
+      <span class="bracket bk-tr"></span>
+      <span class="bracket bk-bl"></span>
+      <span class="bracket bk-br"></span>
+    </div>
   </div>
-  <div id="timeline-timer" class="timeline-timer">0.0</div>
 
-  <!-- Scene Navigation -->
-  <nav id="scene-nav" class="scene-nav">
-    <button class="scene-btn active" data-scene="lockOn" data-phase="void" data-chapter="volunteer">Lock-on</button>
-    <button class="scene-btn" data-scene="dissect" data-phase="roast" data-chapter="roast">Dissect</button>
-    <button class="scene-btn" data-scene="defendant" data-phase="live" data-chapter="trial">Trial</button>
-    <button class="scene-btn" data-scene="refactor" data-phase="build" data-chapter="rebuild">Refactor</button>
-    <button class="scene-btn" data-scene="elevate" data-phase="credits" data-chapter="upgrade">Elevate</button>
+  <header id="placard">
+    <div class="wordmark">Mini</div>
+    <div class="medium">live critique &middot; <span id="medium-mode">print</span></div>
+  </header>
+
+  <div id="status">
+    <span id="live-dot"></span>
+    <span id="status-text">ready</span>
+  </div>
+
+  <div id="verdict" aria-hidden="true">
+    <div class="score"><span id="score">—</span><span class="over">/10</span></div>
+    <div id="worst"></div>
+  </div>
+
+  <nav id="modes" aria-label="Critique mode">
+    <button data-mode="ui" aria-pressed="false">UI</button>
+    <button data-mode="print" aria-pressed="true">Print</button>
+    <button data-mode="art" aria-pressed="false">Art</button>
   </nav>
 
-  <!-- ═══ VOID — cinematic B&W reveal ═══ -->
-  <section id="screen-void" class="screen active">
+  <div id="subtitles"><span id="subtitle-text"></span></div>
 
-    <div class="void-vignette"></div>
+  <div id="hint">Point at the work &middot; tap Scan</div>
 
-    <!-- Mini + Jam scan rings on VOID -->
-    <div id="void-ring-mini" class="void-ring void-ring-mini"></div>
-    <div id="void-ring-jam" class="void-ring void-ring-jam"></div>
-
-    <!-- "hey" text overlay (hidden — title replaces it) -->
-    <span id="hook-hey" class="hook-hey" style="opacity:0; transition: opacity 0.8s ease; display:none">hey</span>
-
-    <!-- Tap hint (removed — CTA is the action) -->
-    <div id="hook-tap-hint" class="hook-tap-hint" style="display:none">tap</div>
-
-    <!-- VOID content — tap to start -->
-    <div id="greet-layer" class="greet-layer">
-      <div class="void-presents">GeminiX presents</div>
-      <div id="greet-tagline" class="greet-tagline visible">Your UI's worst nightmare</div>
-      <button id="btn-start" class="btn-start" onclick="startMini()">START</button>
-    </div>
-
-    <div id="conn-status" class="void-status" style="opacity:0">Connecting…</div>
-  </section>
-
-  <!-- ═══ SCAN ═══ -->
-  <section id="screen-scan" class="screen">
-    <!-- Brand watermark -->
-    <div class="scan-brand">
-      <div class="scan-brand-text">GEMINI<span>X</span></div>
-      <div class="scan-brand-line"></div>
-    </div>
-
-    <div class="scan-capture">
-      <div class="scan-feed" id="scan-feed">
-        <video id="screenVideo" autoplay muted playsinline></video>
-      </div>
-      <!-- Roast target — static iPad image for DISSECT scene -->
-      <img id="roast-target-img"
-           src="%D7%90%D7%99%D7%99%D7%A4%D7%93%20%D7%99%D7%A9%D7%9F%20%D7%91%D7%9C%D7%99%20%D7%AA%D7%A4%D7%A8%D7%99%D7%98%20%D7%A6%D7%B3%D7%90%D7%98.PNG"
-           style="display:none; position:absolute; top:8%; left:50%; transform:translateX(-50%);
-                  max-width:75%; max-height:80%; border-radius:12px;
-                  box-shadow:0 0 40px rgba(168,85,247,0.15); z-index:5;
-                  filter: grayscale(1) saturate(0) brightness(0.75);" />
-      <!-- Color copy of roast image — clipped to scan ring circle -->
-      <img id="roast-target-color"
-           src="%D7%90%D7%99%D7%99%D7%A4%D7%93%20%D7%99%D7%A9%D7%9F%20%D7%91%D7%9C%D7%99%20%D7%AA%D7%A4%D7%A8%D7%99%D7%98%20%D7%A6%D7%B3%D7%90%D7%98.PNG"
-           style="display:none; position:absolute; top:8%; left:50%; transform:translateX(-50%);
-                  max-width:75%; max-height:80%; border-radius:12px; z-index:11;
-                  pointer-events:none; clip-path: circle(0px at 50% 50%);" />
-      <canvas id="offCanvas" style="display:none"></canvas>
-      <canvas id="color-ring-canvas"></canvas>
-      <div id="annoLayer"></div>
-
-      <!-- Inner rings — cinematic portal -->
-      <div class="scan-inner-ring ring-1"></div>
-      <div class="scan-inner-ring ring-2"></div>
-      <div class="scan-inner-ring ring-3"></div>
-
-      <!-- Horizontal scan line -->
-      <div class="scan-line"></div>
-
-      <div id="scan-ring" class="scan-ring"></div>
-      <div id="scan-mini" class="scan-dot mini"></div>
-      <div id="scan-jam" class="scan-dot jam"></div>
-
-      <!-- Viewfinder corner brackets -->
-      <div class="scan-frame" id="scan-frame">
-        <div class="scan-frame-corner tl"></div>
-        <div class="scan-frame-corner tr"></div>
-        <div class="scan-frame-corner bl"></div>
-        <div class="scan-frame-corner br"></div>
-      </div>
-    </div>
-
-    <!-- Song lyrics — synced to music, Netflix style -->
-    <div id="lyrics-bar" class="lyrics-bar">
-      <span id="lyrics-text" class="lyrics-text"></span>
-    </div>
-
-    <!-- Pipeline: 3 model circles on right -->
-    <div class="pipeline" id="pipeline">
-      <!-- 1. GeminiX orchestrator -->
-      <div class="pipe-node active" id="pipe-minix">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/>
-          <line x1="12" y1="2" x2="12" y2="22"/>
-          <line x1="2" y1="8.5" x2="22" y2="8.5"/>
-          <line x1="2" y1="15.5" x2="22" y2="15.5"/>
-        </svg>
-      </div>
-      <div class="pipe-label">GEMINIX</div>
-      <div class="pipe-line" id="pipe-line-1"></div>
-      <!-- 2. Nano Banana — image gen -->
-      <div class="pipe-node" id="pipe-banana">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="18" height="18" rx="3"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <path d="M21 15l-5-5L5 21"/>
-        </svg>
-      </div>
-      <div class="pipe-label">BANANA</div>
-      <div class="pipe-line" id="pipe-line-2"></div>
-      <!-- 3. Lyria — music -->
-      <div class="pipe-node" id="pipe-lyria">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 18V5l12-2v13"/>
-          <circle cx="6" cy="18" r="3"/>
-          <circle cx="18" cy="16" r="3"/>
-        </svg>
-      </div>
-      <div class="pipe-label">LYRIA</div>
-    </div>
-
-    <!-- Data readout panels — left (target info) -->
-    <div class="scan-data scan-data-left">
-      <div class="scan-data-item">
-        <span class="scan-data-label">Target</span>
-        <span class="scan-data-value">IPAD-PRO</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Status</span>
-        <span class="scan-data-value live" id="scan-status">SCANNING</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Score</span>
-        <span class="scan-data-value" id="scan-score" style="color:rgba(239,68,68,0.6)">—</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Issues</span>
-        <span class="scan-data-value" id="scan-issues">—</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Latency</span>
-        <span class="scan-data-value" id="scan-latency">—</span>
-      </div>
-    </div>
-    <!-- Data readout panels — right (system info) -->
-    <div class="scan-data scan-data-right">
-      <div class="scan-data-item">
-        <span class="scan-data-label">Neural</span>
-        <span class="scan-data-value ok">ONLINE</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Agents</span>
-        <span class="scan-data-value" id="scan-agents">2 ACTIVE</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Contrast</span>
-        <span class="scan-data-value" id="scan-contrast">—</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Hierarchy</span>
-        <span class="scan-data-value" id="scan-hierarchy">—</span>
-      </div>
-      <div class="scan-data-item">
-        <span class="scan-data-label">Resolution</span>
-        <span class="scan-data-value" id="scan-resolution">—</span>
-      </div>
-    </div>
-
-    <div id="glow-l" class="glow glow-l"></div>
-    <div id="glow-r" class="glow glow-r"></div>
-    <div id="transcript" class="transcript"></div>
-    <div id="round-badge" class="round"></div>
-  </section>
-
-  <!-- ═══ REBUILD ═══ -->
-  <section id="screen-rebuild" class="screen">
-    <div class="rebuild-grid"></div>
-    <div class="rebuild-agent mini"></div>
-    <div class="rebuild-agent jam"></div>
-    <!-- Rebuild video plays first, then fades to slider -->
-    <video id="rebuild-video" class="rebuild-video" playsinline preload="auto"
-           src="rebuild-video.mp4"></video>
-    <div class="rebuild-compare" id="rebuild-compare" style="display:none">
-      <div class="compare-layer compare-before">
-        <img id="original-snap" src="ui-before.png" alt="Original UI">
-      </div>
-      <div class="compare-layer compare-after">
-        <img id="generatedImg" class="generated" src="ui-after.png" alt="Redesigned UI">
-        <iframe id="previewFrame" sandbox="allow-scripts" style="display:none"></iframe>
-      </div>
-      <div class="compare-handle" id="compare-handle">
-        <div class="compare-line"></div>
-        <div class="compare-knob">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M9 5L4 12L9 19" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M15 5L20 12L15 19" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </div>
-      <!-- labels removed -->
-    </div>
-    <div id="rebuild-progress" class="rebuild-progress" style="display:none">
-      <div class="rebuild-progress-label">Rebuilding Interface</div>
-      <div class="rebuild-progress-bar">
-        <div class="rebuild-progress-fill"></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═══ CURTAIN — Upgrade + Song Video ═══ -->
-  <section id="screen-curtain" class="screen">
-    <img src="burnt-ipad.png" class="burnt-ipad-bg" alt="">
-    <video id="credits-video" class="credits-video" playsinline></video>
-    <div id="credits-lyrics" class="credits-lyrics"></div>
-    <div id="credits-roll" class="credits-roll">
-      <div class="credits-roll-inner">
-        <img src="logo.png" class="credits-logo" alt="GeminX">
-        <div style="height:40px"></div>
-        <div class="credit-block">
-          <small>Director &amp; Screenplay</small>
-          <p>Yosef Bar</p>
-        </div>
-        <div class="credit-block">
-          <small>Lead Performance</small>
-          <p>MiniX <em>(Aggressively Authentic)</em></p>
-        </div>
-        <div class="credit-block">
-          <small>Executive Producer &amp; Silent Partner</small>
-          <p>Jam</p>
-        </div>
-        <div class="credit-block">
-          <small>The Defendant — Special Appearance</small>
-          <p>Gemini <em>(as The Volunteer)</em></p>
-        </div>
-        <div class="credit-block">
-          <small>Art Direction &amp; Concept</small>
-          <p>Nano Banana 2</p>
-        </div>
-        <div class="credit-block">
-          <small>Cinematography &amp; Motion Graphics</small>
-          <p>Veo</p>
-        </div>
-        <div class="credit-block">
-          <small>Original Score &amp; Sound Design</small>
-          <p>Lyria</p>
-        </div>
-        <div class="credit-block">
-          <small>Stage Manager &amp; GitHub Ops</small>
-          <p>Claude Code</p>
-        </div>
-        <div class="credit-divider"></div>
-        <div class="credit-block">
-          <small>Filmed on Location</small>
-          <p>The Safe Room, Tel Aviv</p>
-        </div>
-        <div class="credit-block">
-          <small>Special Effects &amp; Pyrotechnics</small>
-          <p>Iranian Missiles on My House</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Chapter title card — global full-screen overlay -->
-  <div id="chapter-card" class="chapter-card">
-    <div class="chapter-number" id="chapter-number"></div>
-    <div class="chapter-title" id="chapter-title"></div>
+  <div id="actions">
+    <button id="btn-scan" class="btn btn-primary">Scan</button>
+    <button id="btn-rebuild" class="btn" hidden>Rebuild</button>
+    <button id="btn-reset" class="btn btn-ghost" hidden>New</button>
   </div>
 
-  <!-- GCP Terminal — hidden, not needed for demo -->
-  <div class="orch-log" id="orch-log">
-    <div class="orch-log-body" id="orch-log-body"></div>
+  <div id="reveal">
+    <div class="rv-pane" id="rv-after"><img id="after-img" alt="Redesigned work" /></div>
+    <div class="rv-pane" id="rv-before"><img id="before-img" alt="Original work" /></div>
+    <div id="rv-handle"></div>
+    <div class="rv-label rv-before-label">Before</div>
+    <div class="rv-label rv-after-label">After</div>
   </div>
 
-  <script src="/app.js"></script>
+  <canvas id="cap"></canvas>
+
+  <script src="app.js"></script>
 </body>
 
 </html>
