@@ -109,6 +109,7 @@ class Orchestrator {
       if (d.event === 'go_live_manual') this._onUserTranscript('manual', 'Go Live');
       if (d.event === 'reset')          this._reset();
       if (d.event === 'show_me')        this._onShowMe();
+      if (d.event === 'rebuild')        this._startBuild();   // v2: frontend triggers Nano Banana redesign
       if (d.event === 'flush_audio')    this._onCut();
     });
 
@@ -567,10 +568,10 @@ class Orchestrator {
 
     const t0 = Date.now();
     try {
-      const { image_base64 } = req.body;
+      const { image_base64, mode } = req.body;
       if (!image_base64) return res.status(400).json({ error: 'image_base64 required' });
 
-      const scan    = await analyzeScreenshot(image_base64);
+      const scan    = await analyzeScreenshot(image_base64, mode);
       const latency = Date.now() - t0;
       const issues  = scan.issues || scan;
 
@@ -592,13 +593,13 @@ class Orchestrator {
   }
 
   async handleVisionPrefetch(req, res) {
-    const { image_base64 } = req.body;
+    const { image_base64, mode } = req.body;
     if (!image_base64) return res.status(400).json({ error: 'image_base64 required' });
 
-    console.log('[Prefetch] Starting vision analysis in background...');
+    console.log(`[Prefetch] Starting vision analysis in background... (mode: ${mode || 'ui'})`);
     const t0 = Date.now();
     try {
-      const scan = await analyzeScreenshot(image_base64);
+      const scan = await analyzeScreenshot(image_base64, mode);
       const latency = Date.now() - t0;
       const issues = scan.issues || scan;
       this._prefetchedVision = { issues, score: scan.score, worst: scan.worst, image_base64, latency };
