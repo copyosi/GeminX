@@ -35,6 +35,8 @@ let lastFrame   = null;              // last captured jpeg dataURL (the "before"
 let nanoReady   = false;
 let stream      = null;              // camera MediaStream
 let showMeFallbackTimer = null;
+let uploadedB64 = null;              // uploaded image (base64, no data: prefix)
+let docMode     = false;             // true when critiquing an uploaded PDF/DOCX
 
 function setState(s) {
   flowState = s;
@@ -166,11 +168,111 @@ function resetAll() {
   hideSubtitle();
   hideVerdict();
   body.classList.remove('mic-live');
+  // clear any uploaded work — back to the camera exhibit
+  uploadedB64 = null; docMode = false;
+  body.classList.remove('uploaded', 'doc-mode');
+  $('upload-img').removeAttribute('src');
+  $('docsheet').innerHTML = '';
+  $('file-in').value = '';
   $('btn-scan').hidden = false;
+  $('btn-upload').hidden = false;
   $('btn-rebuild').hidden = true;
   $('btn-reset').hidden = true;
   $('reveal').classList.remove('on');
-  send({ event: 'reset' });         // fresh Mini session on server
+  send({ event: 'reset' });         // fresh MiniX session on server
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UPLOAD — print image, or campaign PDF / DOCX (copy & scripts)
+// ═══════════════════════════════════════════════════════════════════
+$('btn-upload').addEventListener('click', () => { if (flowState === 'idle') $('file-in').click(); });
+$('file-in').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (f) handleUpload(f);
+});
+
+function fileKind(f) {
+  const n = (f.name || '').toLowerCase();
+  if ((f.type || '').startsWith('image/')) return 'image';
+  if (f.type === 'application/pdf' || n.endsWith('.pdf')) return 'pdf';
+  if (n.endsWith('.docx')) return 'docx';
+  return null;
+}
+
+async function handleUpload(file) {
+  if (flowState !== 'idle') return;
+  const kind = fileKind(file);
+  if (!kind) { showNotice('unsupported file — image, pdf or docx'); return; }
+  if (file.size > 11 * 1024 * 1024) { showNotice('file too large — max 11mb'); return; }
+
+  const dataURL = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const b64 = String(dataURL).split(',')[1];
+
+  setState('scanning');
+  status('scanning');
+  hideVerdict();
+  clearMarks();
+  ensureAudioCtx();
+  await startAudioOnly();            // mic for the live debate — no camera needed
+
+  if (kind === 'image') {
+    uploadedB64 = b64;
+    lastFrame = dataURL;             // the "before" plate for rebuild
+    const img = $('upload-img');
+    img.src = dataURL;
+    body.classList.add('uploaded');
+    img.onload = positionMarks;
+  } else {
+    docMode = true;
+    body.classList.add('doc-mode');
+  }
+
+  // Connect MiniX + greet, then feed the scan (same protocol as camera).
+  greetDone = false; showMeSent = false;
+  send({ event: 'greet' });
+
+  try {
+    if (kind === 'image') {
+      await fetch('/api/vision-prefetch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image_base64: b64, mode }),
+      });
+    } else {
+      await fetch('/api/doc-critique', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kind, name: file.name, data_base64: b64 }),
+      });
+    }
+  } catch (err) {
+    console.warn('[Upload] critique request failed:', err.message);
+    showNotice('scan failed — check connection');
+  }
+
+  clearTimeout(showMeFallbackTimer);
+  showMeFallbackTimer = setTimeout(() => { if (!showMeSent) sendShowMe(); }, 5000);
+}
+
+// Mic-only capture for uploaded work (camera stays off).
+async function startAudioOnly() {
+  if (micProcessor) return;
+  let s = null;
+  if (window._warmStream && window._warmStream.getAudioTracks().length) {
+    s = window._warmStream; window._warmStream = null;
+    s.getTracks().forEach(t => (t.enabled = t.kind === 'audio'));
+  } else {
+    try {
+      s = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
+      });
+    } catch (e) { console.warn('[Upload] no mic:', e.message); return; }
+  }
+  startMicCapture(s);
+  startAudioHealthCheck();
 }
 
 // ── Buttons ──
@@ -278,13 +380,52 @@ async function prefetchVision(attempt = 0) {
 function onVisionResult(ev) {
   const issues = ev.issues || [];
   showVerdict(ev.score, ev.worst);
-  // Drop quiet marks where the scan found issues; Mini emphasizes them
-  // live as she points via annotate_at.
-  clearMarks();
-  issues.slice(0, 5).forEach((iss, i) => {
-    setTimeout(() => addMark(iss.x, iss.y, iss.label, 'scan'), 260 * i);
-  });
+  if (docMode) {
+    // Written material — the quotes ARE the marks.
+    renderDocSheet(issues);
+  } else {
+    // Drop quiet marks where the scan found issues; MiniX emphasizes them
+    // live as she points via annotate_at.
+    clearMarks();
+    issues.slice(0, 5).forEach((iss, i) => {
+      setTimeout(() => addMark(iss.x, iss.y, iss.label, 'scan'), 260 * i);
+    });
+  }
   if (flowState === 'scanning') setState('live');
+}
+
+// ── Doc sheet: quoted lines from an uploaded campaign/script ──
+function renderDocSheet(issues) {
+  const sheet = $('docsheet');
+  sheet.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'doc-title';
+  title.textContent = 'the material · quoted';
+  sheet.appendChild(title);
+  issues.slice(0, 5).forEach((iss, i) => {
+    const el = document.createElement('div');
+    el.className = 'doc-issue';
+    const rtl = isRTL((iss.quote || '') + iss.label + (iss.detail || ''));
+    if (rtl) el.dir = 'rtl';
+    const label = document.createElement('div');
+    label.className = 'di-label';
+    label.textContent = iss.label || '';
+    el.appendChild(label);
+    if (iss.quote) {
+      const q = document.createElement('div');
+      q.className = 'di-quote';
+      q.textContent = `"${iss.quote}"`;
+      el.appendChild(q);
+    }
+    if (iss.detail) {
+      const d = document.createElement('div');
+      d.className = 'di-detail';
+      d.textContent = iss.detail;
+      el.appendChild(d);
+    }
+    sheet.appendChild(el);
+    setTimeout(() => el.classList.add('in'), 260 * i + 60);
+  });
 }
 
 function showVerdict(score, worst) {
@@ -294,8 +435,10 @@ function showVerdict(score, worst) {
   $('verdict').setAttribute('aria-hidden', 'false');
   body.classList.add('has-verdict');
   // Offer the Rebuild action once there's a critique on the table.
+  // (No rebuild for written material — Nano Banana rebuilds images.)
   $('btn-scan').hidden = true;
-  $('btn-rebuild').hidden = false;
+  $('btn-upload').hidden = true;
+  $('btn-rebuild').hidden = docMode;
   $('btn-reset').hidden = false;
 }
 function hideVerdict() { body.classList.remove('has-verdict'); $('verdict').setAttribute('aria-hidden', 'true'); }
@@ -339,8 +482,12 @@ let markCount = 0;
 // Place the marks layer over the actual letterboxed video content rect,
 // so x/y percentages land on the artwork, not the black mat.
 function videoContentRect() {
-  const cw = video.clientWidth, ch = video.clientHeight;
-  const vw = video.videoWidth  || 16, vh = video.videoHeight || 9;
+  // The active exhibit is either the camera or an uploaded image.
+  const up = body.classList.contains('uploaded') ? $('upload-img') : null;
+  const el = (up && up.naturalWidth) ? up : video;
+  const cw = el.clientWidth, ch = el.clientHeight;
+  const vw = (up && up.naturalWidth) ? up.naturalWidth : (video.videoWidth || 16);
+  const vh = (up && up.naturalWidth) ? up.naturalHeight : (video.videoHeight || 9);
   const scale = Math.min(cw / vw, ch / vh);
   const w = vw * scale, h = vh * scale;
   return { left: (cw - w) / 2, top: (ch - h) / 2, width: w, height: h };

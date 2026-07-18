@@ -19,6 +19,7 @@ const orchestrator = new Orchestrator(server);
 // ─── Routes ───────────────────────────────────────────────────────────────
 app.post('/api/vision-tick',     (req, res) => orchestrator.handleVisionTick(req, res));
 app.post('/api/vision-prefetch', (req, res) => orchestrator.handleVisionPrefetch(req, res));
+app.post('/api/doc-critique',    (req, res) => orchestrator.handleDocCritique(req, res));
 app.post('/api/phase',           (req, res) => orchestrator.handlePhaseChange(req, res));
 app.get('/health',               (_,  res) => res.json(orchestrator.health()));
 app.post('/api/clear-history',   (_,  res) => { require('./services/history').clear(); res.json({ status: 'cleared' }); });

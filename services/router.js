@@ -15,6 +15,7 @@ const MODE_LABEL = {
   ui:    'ממשק',
   print: 'מודעת פרינט',
   art:   'עבודה ויזואלית',
+  copy:  'חומר כתוב — קמפיין או תסריט',
   // legacy visual states from the hackathon build still resolve:
   main_screen: 'מסך הבית של האפליקציה',
   menu_open:   'מגירת הניווט',
@@ -69,9 +70,11 @@ function topicHint(history, mode = 'ui') {
 function humanizeIssues(issues, score, worst) {
   if (!issues || issues.length === 0) return 'משהו בעבודה לא עובד אבל קשה לשים עליו אצבע.';
   const lines = issues.map(i => {
-    const pos = `(${i.x},${i.y})`;
+    const pos = (Number.isFinite(Number(i.x)) && Number.isFinite(Number(i.y)) && i.x != null)
+      ? ` (${i.x},${i.y})` : '';
+    const quote = i.quote ? ` ציטוט: "${i.quote}"` : '';
     const sev = i.severity >= 4 ? 'חמור' : i.severity >= 3 ? 'בולט' : 'קל';
-    return `${sev}: ${i.label} — ${i.detail} ${pos}`;
+    return `${sev}: ${i.label} — ${i.detail}${quote}${pos}`;
   });
   let out = lines.join('\n');
   if (score != null) out += `\nציון כולל: ${score}/10.`;

@@ -3,6 +3,108 @@ const { API_KEY, VISION_MODEL } = require('../config');
 
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
+// ─── Document critique (copy decks / campaign PDFs / scripts) ────────
+// Uploaded PDF goes to Gemini natively; DOCX is extracted to text first
+// (mammoth). Issues carry verbatim QUOTES instead of x/y coordinates —
+// there is no frame to point at, the words themselves are the target.
+
+const DOC_PROMPT = `You are a senior copywriter and creative director
+reviewing WRITTEN campaign material — a copy deck, a print campaign
+PDF, a script (TV / radio / social). The material may be in Hebrew —
+read it as a native. Critique the WRITING and the THINKING.
+
+types: headline|promise|cliche|rhythm|reader_focus|structure|cta|idea
+Focus:
+- headline/opening: does the first line earn the next one
+- promise: one sharp promise — or perfume
+- cliche: dead phrases (generic superlatives, "one-stop", empty adjectives)
+- rhythm: sentences all the same length, no punch, no breath
+- reader_focus: talks about the company instead of the reader
+- structure: builds to something — or wanders
+- cta: what should the reader do, and is it worth doing
+- idea: is there one, and does every line serve it
+
+Return ONLY valid JSON:
+{
+  "issues": [
+    { "type": "<one of the types above>",
+      "severity": 1-5,
+      "quote": "SHORT verbatim quote from the material",
+      "label": "2-4 word Hebrew label",
+      "detail": "one sharp Hebrew sentence" }
+  ],
+  "score": 1-10,
+  "worst": "worst aspect in 3 Hebrew words"
+}
+Rules:
+- Max 5 issues, sorted by severity (worst first)
+- "quote" MUST be verbatim from the material — never invented
+- "label" and "detail" in HEBREW
+- ZERO conversational text. Data only.`;
+
+/**
+ * Critique a written document (campaign PDF / DOCX copy or script).
+ * kind: 'pdf' | 'docx'. Always resolves — never throws.
+ */
+async function analyzeDocument(kind, base64) {
+  let parts;
+  try {
+    if (kind === 'pdf') {
+      parts = [
+        { text: DOC_PROMPT },
+        { inlineData: { mimeType: 'application/pdf', data: base64 } },
+      ];
+    } else {
+      const mammoth = require('mammoth');
+      const buf = Buffer.from(base64, 'base64');
+      const { value } = await mammoth.extractRawText({ buffer: buf });
+      const text = (value || '').trim().slice(0, 20000);
+      if (!text) return docFallback();
+      parts = [{ text: `${DOC_PROMPT}\n\nTHE MATERIAL:\n${text}` }];
+    }
+
+    const result = await ai.models.generateContent({
+      model: VISION_MODEL,
+      contents: [{ role: 'user', parts }],
+      generationConfig: { responseMimeType: 'application/json' },
+    });
+
+    const raw = JSON.parse(result.text);
+    const issues = (Array.isArray(raw.issues) ? raw.issues : [])
+      .slice(0, 5)
+      .map(i => ({
+        type:     String(i.type || 'idea'),
+        severity: Math.max(1, Math.min(5, Number(i.severity) || 3)),
+        quote:    i.quote ? String(i.quote).slice(0, 200) : null,
+        label:    String(i.label || 'בעיה'),
+        detail:   String(i.detail || ''),
+      }));
+    if (issues.length === 0) return docFallback();
+    return {
+      issues,
+      score: Math.max(1, Math.min(10, Number(raw.score) || 4)),
+      worst: String(raw.worst || 'הכול'),
+      mode: 'copy',
+    };
+  } catch (err) {
+    console.error('[Vision:doc] error:', err.message);
+    return docFallback();
+  }
+}
+
+function docFallback() {
+  return {
+    issues: [
+      { type: 'promise', severity: 5, quote: null, label: 'אין הבטחה אחת', detail: 'החומר מבטיח הכול — כלומר כלום' },
+      { type: 'reader_focus', severity: 4, quote: null, label: 'מדבר על עצמו', detail: 'הקופי עסוק בחברה במקום בקורא' },
+      { type: 'rhythm', severity: 3, quote: null, label: 'בלי פאנץ', detail: 'כל המשפטים באותו אורך — אין נשימה ואין מכה' },
+    ],
+    score: 3,
+    worst: 'הכול',
+    mode: 'copy',
+  };
+}
+
 // ─── Per-mode critique taxonomies (Yosef 17.7: "special skills for
 // print" — each mode gets its own checks, short list, kill fast) ─────
 
@@ -138,4 +240,4 @@ function fallbackResult(mode = 'ui') {
   return { issues: byMode[mode] || byMode.ui, score: 3, worst: 'הכול', mode };
 }
 
-module.exports = { analyzeScreenshot };
+module.exports = { analyzeScreenshot, analyzeDocument };

@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>MiniX — live critique</title>
+  <link rel="icon" href="logo.png" type="image/png" />
   <style>
     /* ═══════════════════════════════════════════════════════════════
        MINI — a live visual-critique instrument.
@@ -69,6 +70,17 @@
       display: grid; place-items: center;
       overflow: hidden;
     }
+
+    /* uploaded work — replaces the camera as the exhibit */
+    #upload-img {
+      position: absolute; inset: 0; z-index: 2;
+      width: 100%; height: 100%;
+      object-fit: contain;
+      background: var(--ground-mat);
+      display: none;
+    }
+    body.uploaded #upload-img { display: block; }
+    body.uploaded #video { visibility: hidden; }
 
     /* soft gallery vignette — grounds the mat, no decoration */
     #stage::after {
@@ -321,6 +333,39 @@
     .rv-before-label { left: calc(var(--safe-l) + var(--edge)); }
     .rv-after-label  { right: calc(var(--safe-r) + var(--edge)); color: var(--red); }
 
+    /* ── Doc sheet: quoted-line critique for uploaded copy/scripts ── */
+    #docsheet {
+      position: fixed; z-index: 18;
+      left: calc(var(--safe-l) + var(--edge));
+      top: calc(var(--safe-t) + 96px);
+      width: min(420px, 78vw);
+      max-height: 55vh; overflow-y: auto;
+      display: none; flex-direction: column; gap: 14px;
+      pointer-events: none;
+    }
+    body.doc-mode #docsheet { display: flex; }
+    .doc-title {
+      font-family: var(--mono); font-size: 10px; letter-spacing: 0.26em;
+      text-transform: uppercase; color: var(--zinc);
+      padding-bottom: 6px; border-bottom: 1px solid var(--hair);
+    }
+    .doc-issue { opacity: 0; transform: translateY(6px); transition: opacity 400ms ease, transform 400ms ease; }
+    .doc-issue.in { opacity: 1; transform: none; }
+    .doc-issue .di-label {
+      font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.18em;
+      text-transform: uppercase; color: var(--red);
+    }
+    .doc-issue .di-quote {
+      font-family: var(--serif); font-style: italic;
+      font-size: 16px; line-height: 1.45; color: var(--ink);
+      margin-top: 3px;
+    }
+    .doc-issue .di-detail {
+      font-family: var(--sans); font-size: 12.5px; line-height: 1.5;
+      color: var(--ink-soft); margin-top: 3px;
+    }
+    .doc-issue[dir="rtl"] { text-align: right; }
+
     /* ── Notice: visible failure line (iron rule: no silent errors) ── */
     #notice {
       position: fixed; z-index: 23;
@@ -357,6 +402,7 @@
 <body class="state-idle" data-mode="print">
   <div id="stage">
     <video id="video" playsinline muted autoplay></video>
+    <img id="upload-img" alt="Uploaded work" />
     <div id="marks"></div>
     <div id="ring">
       <div class="ring-rot">
@@ -401,15 +447,19 @@
 
   <div id="subtitles"><span id="subtitle-text"></span></div>
 
-  <div id="hint">Point at the work &middot; tap Scan</div>
+  <div id="hint">Point at the work &middot; Scan &mdash; or Upload a print / campaign</div>
 
   <div id="notice" role="status"></div>
 
   <div id="actions">
     <button id="btn-scan" class="btn btn-primary">Scan</button>
+    <button id="btn-upload" class="btn btn-ghost">Upload</button>
     <button id="btn-rebuild" class="btn" hidden>Rebuild</button>
     <button id="btn-reset" class="btn btn-ghost" hidden>New</button>
   </div>
+  <input type="file" id="file-in" accept="image/*,application/pdf,.pdf,.docx" hidden />
+
+  <div id="docsheet" aria-live="polite"></div>
 
   <div id="reveal">
     <div class="rv-pane" id="rv-after"><img id="after-img" alt="Redesigned work" /></div>

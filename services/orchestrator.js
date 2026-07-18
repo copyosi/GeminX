@@ -1,6 +1,6 @@
 const { WebSocketServer, WebSocket } = require('ws');
 const Agent = require('./Agent');
-const { analyzeScreenshot } = require('./vision');
+const { analyzeScreenshot, analyzeDocument } = require('./vision');
 const { generateRedesign } = require('./imageGen');
 // Lyria removed — credits music is now a static file (Code_is_Disease.mp3) on frontend
 const {
@@ -577,6 +577,27 @@ class Orchestrator {
       this._prefetchedVision = null;
       res.status(500).json({ error: err.message });
     }
+  }
+
+  // ─── Document critique — uploaded campaign PDF / DOCX (copy, scripts) ──
+  async handleDocCritique(req, res) {
+    const { kind, name, data_base64 } = req.body ?? {};
+    if (!data_base64) return res.status(400).json({ error: 'data_base64 required' });
+    if (!['pdf', 'docx'].includes(kind)) return res.status(400).json({ error: 'kind must be pdf|docx' });
+    if (data_base64.length > 15_000_000) return res.status(413).json({ error: 'file too large (max ~11MB)' });
+
+    console.log(`[Doc] 📄 Critiquing uploaded ${kind}: "${(name || 'unnamed').slice(0, 60)}"`);
+    const t0 = Date.now();
+    const scan = await analyzeDocument(kind, data_base64);
+    const latency = Date.now() - t0;
+
+    this.mode = 'copy';                       // written-material eye
+    this._prefetchedVision = {
+      issues: scan.issues, score: scan.score, worst: scan.worst,
+      image_base64: null, latency,
+    };
+    console.log(`[Doc] ✔ ${scan.issues.length} issues (score:${scan.score}) in ${latency}ms`);
+    res.json({ status: 'ok', latency, issueCount: scan.issues.length });
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
