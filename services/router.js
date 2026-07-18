@@ -12,13 +12,13 @@
  */
 
 const MODE_LABEL = {
-  ui:    'an interface',
-  print: 'a print ad',
-  art:   'a piece of visual work',
+  ui:    'ממשק',
+  print: 'מודעת פרינט',
+  art:   'עבודה ויזואלית',
   // legacy visual states from the hackathon build still resolve:
-  main_screen: 'the app home screen',
-  menu_open:   'the navigation drawer',
-  live_ui:     'the live conversation screen',
+  main_screen: 'מסך הבית של האפליקציה',
+  menu_open:   'מגירת הניווט',
+  live_ui:     'מסך השיחה החיה',
 };
 
 // ── Light topic tracking, per mode ───────────────────────────────────
@@ -59,7 +59,7 @@ function topicHint(history, mode = 'ui') {
   const covered = aspects.filter(a => a.re.test(h)).map(a => a.label);
   const fresh   = aspects.filter(a => !a.re.test(h)).map(a => a.label);
   if (fresh.length > 0 && covered.length > 0) {
-    return `\n(Already covered: ${covered.join(', ')} — try something new)`;
+    return `\n(כבר כוסה: ${covered.join(', ')} — עברי למשהו חדש)`;
   }
   return '';
 }
@@ -67,46 +67,47 @@ function topicHint(history, mode = 'ui') {
 // ── Humanize vision JSON → natural language ──────────────────────────
 
 function humanizeIssues(issues, score, worst) {
-  if (!issues || issues.length === 0) return 'The work looks off but hard to pin down.';
+  if (!issues || issues.length === 0) return 'משהו בעבודה לא עובד אבל קשה לשים עליו אצבע.';
   const lines = issues.map(i => {
     const pos = `(${i.x},${i.y})`;
-    const sev = i.severity >= 4 ? 'major' : i.severity >= 3 ? 'notable' : 'minor';
+    const sev = i.severity >= 4 ? 'חמור' : i.severity >= 3 ? 'בולט' : 'קל';
     return `${sev}: ${i.label} — ${i.detail} ${pos}`;
   });
   let out = lines.join('\n');
-  if (score != null) out += `\nOverall score: ${score}/10.`;
-  if (worst) out += ` Worst area: ${worst}.`;
+  if (score != null) out += `\nציון כולל: ${score}/10.`;
+  if (worst) out += ` האזור הגרוע: ${worst}.`;
   return out;
 }
 
-// ─── GREET — no script: Mini is just... on ───────────────────────────
+// ─── GREET — no script: MiniX is just... on ──────────────────────────
 
 function miniGreet() {
-  return `You're live. Someone just pointed a camera at work they want
-critiqued. Greet in ONE short line and ask what you're looking at.
-No performance. You're a critic on the clock.`;
+  return `את בשידור. מישהו כיוון מצלמה על עבודה שהוא רוצה ביקורת עליה.
+ברכי במשפט קצר אחד ושאלי על מה את מסתכלת. בעברית. בלי הצגה — את
+מבקרת על השעון.`;
 }
 
 // ─── LOCK-ON — first roast turn (real critique, no scene framing) ────
 
 function miniSceneStart(issues, visualState) {
-  const subject = MODE_LABEL[visualState] || 'the work in front of you';
+  const subject = MODE_LABEL[visualState] || 'העבודה שמולך';
   const issueText = humanizeIssues(issues);
 
-  return `Camera locked on ${subject}. This is a REAL live critique —
-whoever made this may be in the room and may answer you.
+  return `המצלמה ננעלה על ${subject}. זו ביקורת חיה אמיתית — מי שיצר
+את זה אולי בחדר ואולי יענה לך.
 
-Targets:
+מטרות:
 ${issueText}
 
-Kill. One target at a time.`;
+קטלי. בעברית בלבד. מטרה אחת בכל פעם — צטטי את מה שבאמת כתוב/נראה
+בעבודה, לא כלליות.`;
 }
 
-// ─── ROAST CONTINUE — nudge if Mini pauses ──────────────────────────
+// ─── ROAST CONTINUE — nudge if MiniX pauses ─────────────────────────
 
 function miniContinue(issues) {
   const issueText = humanizeIssues(issues);
-  return `Keep going. More targets:\n${issueText}`;
+  return `המשיכי. עוד מטרות:\n${issueText}`;
 }
 
 // ─── LEGACY — kept for orchestrator compatibility ────────────────────
@@ -116,18 +117,19 @@ function miniRoast(issues, visualState) {
 }
 
 function miniRoastContinue(miniPrevious, visualState, history) {
-  const ctx = history ? `\nYOU SAID SO FAR:\n${history}` : '';
+  const ctx = history ? `\nמה שאמרת עד עכשיו:\n${history}` : '';
   const mode = ['ui', 'print', 'art'].includes(visualState) ? visualState : 'ui';
 
-  return `You already said: "${miniPrevious}"${ctx}
+  return `כבר אמרת: "${miniPrevious}"${ctx}
 
-New mark (RED). Go deeper — find something else.${topicHint(history, mode)}`;
+סימון חדש (אדום). לכי עמוק יותר — מצאי משהו אחר.${topicHint(history, mode)}`;
 }
 
 // ─── CLOSE — Transition to BUILD ────────────────────────────────────
 
 function miniClose() {
-  return `Roast's over. Say: "Jam, hand this to Nano Banana." — that triggers the rebuild pipeline.`;
+  return `הרוסט נגמר. משפט אחד בעברית: מה הדבר האחד שחייב להשתנות —
+ושנאנו-בננה כבר עובדת על זה.`;
 }
 
 module.exports = {

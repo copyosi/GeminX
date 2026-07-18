@@ -321,6 +321,19 @@
     .rv-before-label { left: calc(var(--safe-l) + var(--edge)); }
     .rv-after-label  { right: calc(var(--safe-r) + var(--edge)); color: var(--red); }
 
+    /* ── Notice: visible failure line (iron rule: no silent errors) ── */
+    #notice {
+      position: fixed; z-index: 23;
+      left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--safe-b) + 148px);
+      font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em;
+      text-transform: uppercase; color: var(--red);
+      background: rgba(6,6,7,0.7); padding: 6px 12px; border-radius: 2px;
+      opacity: 0; pointer-events: none;
+      transition: opacity 300ms ease;
+    }
+    #notice.visible { opacity: 1; }
+
     /* ── Idle hint ───────────────────────────────────────────────── */
     #hint {
       position: fixed; z-index: 17; left: 50%; transform: translateX(-50%);
@@ -389,6 +402,8 @@
   <div id="subtitles"><span id="subtitle-text"></span></div>
 
   <div id="hint">Point at the work &middot; tap Scan</div>
+
+  <div id="notice" role="status"></div>
 
   <div id="actions">
     <button id="btn-scan" class="btn btn-primary">Scan</button>

@@ -55,7 +55,7 @@ function getHistoryBlock() {
 
   // Build history string, newest last, capped at MAX_CHARS
   let lines = turns.map(t => {
-    const who = t.role === 'mini' ? 'You (Mini)' : 'Yosef';
+    const who = t.role === 'mini' ? 'את (מיניX)' : 'יוסף';
     return `${who}: "${t.text}"`;
   });
 

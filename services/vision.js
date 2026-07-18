@@ -22,6 +22,8 @@ Rules:
 - Max 5 issues, sorted by severity (worst first)
 - x/y = percentage position where the issue lives
 - label: SHORT, fits a badge. detail: one sharp sentence.
+- "label" and "detail" MUST be written in HEBREW — the stage language.
+  When critiquing copy, quote the actual words from the work.
 - ZERO conversational text. Data only.
 - The subject may be photographed at an angle (a page on a table,
   a poster on a wall) — coordinates relative to the artwork itself.`;
@@ -118,22 +120,22 @@ async function analyzeScreenshot(imageBase64, mode = 'ui') {
 function fallbackResult(mode = 'ui') {
   const byMode = {
     ui: [
-      { type: 'hierarchy', severity: 5, x: 50, y: 40, label: 'No Hierarchy', detail: 'No clear visual hierarchy guides the eye' },
-      { type: 'touch_target', severity: 4, x: 50, y: 90, label: 'Tiny Targets', detail: 'Touch targets too small for comfortable tapping' },
-      { type: 'contrast', severity: 3, x: 50, y: 15, label: 'Low Contrast', detail: 'Text lacks contrast against background' },
+      { type: 'hierarchy', severity: 5, x: 50, y: 40, label: 'אין היררכיה', detail: 'שום היררכיה ויזואלית לא מובילה את העין' },
+      { type: 'touch_target', severity: 4, x: 50, y: 90, label: 'מטרות זעירות', detail: 'אזורי מגע קטנים מדי ללחיצה נוחה' },
+      { type: 'contrast', severity: 3, x: 50, y: 15, label: 'קונטרסט חלש', detail: 'הטקסט נבלע ברקע' },
     ],
     print: [
-      { type: 'headline', severity: 5, x: 50, y: 20, label: 'Headline Says Nothing', detail: 'The headline could top any ad in any category' },
-      { type: 'cta', severity: 4, x: 50, y: 85, label: 'No Next Step', detail: 'Nothing tells the reader what to do now' },
-      { type: 'cliche', severity: 3, x: 50, y: 50, label: 'Stock Feeling', detail: 'The visual has been seen a thousand times' },
+      { type: 'headline', severity: 5, x: 50, y: 20, label: 'כותרת שלא אומרת כלום', detail: 'הכותרת יכולה לככב בכל מודעה בכל קטגוריה' },
+      { type: 'cta', severity: 4, x: 50, y: 85, label: 'אין צעד הבא', detail: 'שום דבר לא אומר לקורא מה לעשות עכשיו' },
+      { type: 'cliche', severity: 3, x: 50, y: 50, label: 'ריח של סטוק', detail: 'הוויזואל הזה נראה אלף פעמים' },
     ],
     art: [
-      { type: 'concept_execution', severity: 5, x: 50, y: 40, label: 'Idea Missing', detail: 'Execution without a visible concept behind it' },
-      { type: 'composition', severity: 4, x: 50, y: 60, label: 'Eye Gets Lost', detail: 'No path for the eye through the frame' },
-      { type: 'typography_pairing', severity: 3, x: 50, y: 25, label: 'Fonts Fighting', detail: 'Typefaces compete instead of pairing' },
+      { type: 'concept_execution', severity: 5, x: 50, y: 40, label: 'אין רעיון', detail: 'ביצוע בלי קונספט נראה לעין מאחוריו' },
+      { type: 'composition', severity: 4, x: 50, y: 60, label: 'העין הולכת לאיבוד', detail: 'אין מסלול לעין דרך הפריים' },
+      { type: 'typography_pairing', severity: 3, x: 50, y: 25, label: 'פונטים רבים', detail: 'הגופנים מתחרים במקום להשלים' },
     ],
   };
-  return { issues: byMode[mode] || byMode.ui, score: 3, worst: 'overall', mode };
+  return { issues: byMode[mode] || byMode.ui, score: 3, worst: 'הכול', mode };
 }
 
 module.exports = { analyzeScreenshot };

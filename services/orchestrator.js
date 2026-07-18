@@ -28,6 +28,7 @@ const CHAPTERS = {
 class Orchestrator {
   constructor(httpServer) {
     this.phase         = 'void';
+    this.mode          = 'print';   // critique eye: ui | print | art (frontend default: print)
     this.visualState   = 'main_screen';
     this.lastIssues    = [];
     this.lastScreenshot = null;
@@ -135,23 +136,9 @@ class Orchestrator {
     this.phase = phase;
     this.broadcast({ event: 'phase_change', phase });
     console.log(`[Phase] → ${phase}`);
-
-    // Tell Mini where she is now — no reconnect, keep context
-    const PHASE_MSG = {
-      roast:   'Scene change. Chapter 2 — The Roast. You are looking at Gemini\'s home screen. Roast mode. Wait for Go Live.',
-      live:    'Scene change. Chapter 3 — The Trial. Gemini Live is in the room. You are the prosecutor. Wait for Go Live.',
-      build:   'Scene change. Chapter 4 — The Rebuild. Nano Banana is generating the redesign. Wait for Go Live.',
-      credits: 'Scene change. Chapter 5 — The Upgrade. Final scene. Wait for Go Live.',
-    };
-    const msg = PHASE_MSG[phase];
-    if (msg && this.agents.mini.alive) {
-      console.log(`[Phase] 📨 Telling Mini about scene change: ${phase}`);
-      this.agents.mini.send(msg);
-    }
-    if (phase === 'roast') {
-      this.roastPart = 'solo';
-    }
-
+    // v2: no scene-change nudges to MiniX — the hackathon chapter messages
+    // ("You are looking at Gemini's home screen") kept dragging her back
+    // into UI-world on print/art sessions.
   }
 
   // ── Chapter title card ─────────────────────────────────────────────────
@@ -219,70 +206,41 @@ class Orchestrator {
     history.addTurn('user', clean);
     console.log(`[History] 👂 User: "${clean.slice(0, 80)}"`);
 
+    // v2: no "Go Live" / chapter nudges — the hackathon script is retired.
+    // MiniX flows bidirectionally; the only voice trigger kept is a wrap-up cue.
     const lower = clean.toLowerCase();
-
-    // "Go Live" → Mini starts performing current chapter
-    if (lower.includes('go live')) {
-      let nudge;
-      if (this.phase === 'void') {
-        nudge = 'Action. Chapter 1 — The Volunteer. Say your opening line only. Then stop and wait for Yosef to respond.';
-        this.debating = true;  // Enable mic audio to Mini
-      } else if (this.phase === 'roast' && this.roastPart === 'solo') {
-        nudge = 'Action. Chapter 2 — The Roast. You are looking at Gemini\'s home screen right now. Start with DEAD SPACE — all that wasted empty space. Follow the script in order. Use annotate_ui to point at each target. Go.';
-        this.debating = true;
-      } else if (this.phase === 'live') {
-        nudge = 'Action. Gemini Live is in the room. He can hear you. Go at him — prosecute his UI. MAX 20 words, then let him respond.';
-        this.debating = true;
-      } else if (this.phase === 'build') {
-        nudge = 'Action. Chapter 4 — The Rebuild. The redesign is happening. Comment on it. "Not bad. For a banana."';
-      } else if (this.phase === 'credits') {
-        nudge = 'Action. Chapter 5 — The Upgrade. Wrap it up. Thank Yosef. "You can\'t upgrade, but if we win — Vegas."';
-      }
-      if (nudge) {
-        // Connect Mini on first Go Live if not connected yet
-        if (!this.agents.mini.ready) {
-          this.agents.mini.connect();
-          // Wait for connection before sending nudge
-          const waitAndSend = () => {
-            if (this.agents.mini.ready) {
-              this.agents.mini.send(nudge);
-              console.log(`[Trigger] 🎬 "Go Live" → ${this.phase}${this.phase === 'roast' ? '/' + this.roastPart : ''} nudge sent (after connect)`);
-            } else {
-              setTimeout(waitAndSend, 200);
-            }
-          };
-          setTimeout(waitAndSend, 500);
-        } else {
-          this.agents.mini.send(nudge);
-          console.log(`[Trigger] 🎬 "Go Live" → ${this.phase}${this.phase === 'roast' ? '/' + this.roastPart : ''} nudge sent`);
-        }
-      }
-    }
-
-    // "Okay" → wrap up current sub-scene
-    if (lower === 'okay' || lower === 'ok' || lower.includes('okay cut') || lower.includes('ok cut')) {
-      if (this.phase === 'roast' && this.roastPart === 'solo') {
-        // 2A done → transition to 2B (live debate)
-        this.roastPart = 'live';
-        this.agents.mini.send('Interesting. Let\'s see what the volunteer has to say about this. Wait for "Go Live".');
-        console.log(`[Trigger] ✂ "Okay" → roast solo done → switching to live. Waiting for "Go Live".`);
-      } else {
-        this.agents.mini.send('Wrap up now. One sentence to close this scene. Then stop.');
-        console.log(`[Trigger] ✂ "Okay" → wrap-up sent (${this.phase})`);
-      }
+    if (lower === 'okay cut' || lower === 'ok cut' || clean === 'קאט') {
+      this.agents.mini.send('סיימי עכשיו. משפט אחד לסגירה, בעברית. ואז עצרי.');
+      console.log(`[Trigger] ✂ wrap-up sent (${this.phase})`);
     }
   }
 
   _onMiniTranscript(agentName, text) {
     if (text && text.trim()) {
-      // Log what Mini says — this is the deploy log
-      console.log(`[LIVE] 🗣 Mini: "${text.trim().slice(0, 200)}"`);
+      // Log what MiniX says — this is the deploy log
+      console.log(`[LIVE] 🗣 MiniX: "${text.trim().slice(0, 200)}"`);
+      // She speaks in AUDIO modality, so the transcript IS her critique text.
+      // Accumulate it — this is what Nano Banana rebuilds from (fullCritique
+      // was arriving empty because only rare text parts fed miniBuffer).
+      this.miniBuffer += text;
       // Broadcast to frontend for subtitle — keep leading space for word separation
       this.broadcast({ event: 'mini_transcript', text });
     }
   }
 
   _onToolCall(agentName, callId, toolName, args) {
+    // set_mode is resolved server-side: MiniX asked what we're killing today,
+    // the human answered, she picks the eye. No frontend ack needed.
+    if (toolName === 'set_mode') {
+      const mode = ['ui', 'print', 'art'].includes(args?.mode) ? args.mode : null;
+      if (mode) {
+        this.mode = mode;
+        this.broadcast({ event: 'mode_change', mode });
+        console.log(`[Mode] 🎯 MiniX set critique eye → ${mode}`);
+      }
+      this.agents[agentName].confirmTool(callId, toolName, { status: mode ? 'ok' : 'invalid_mode' });
+      return;
+    }
     this.pendingTools.set(callId, agentName);
     this.broadcast({ event: 'tool_execution', agent: agentName, callId, tool_name: toolName, args });
   }
@@ -396,7 +354,7 @@ class Orchestrator {
         }, ROAST_TIMEOUT_MS);
 
         this.broadcast({ event: 'vision_result', issues, score, worst, latency });
-        this.agents.mini.send(miniRoast(issues, this.visualState));
+        this.agents.mini.send(miniRoast(issues, this.mode));
         return;
       }
 
@@ -422,7 +380,7 @@ class Orchestrator {
           }, ROAST_TIMEOUT_MS);
 
           this.agents.mini.send(
-            `No screen to look at right now. Yosef wants to talk. Have a free conversation — stay in character. Be yourself. React to what he says.`
+            `אין עבודה מול העיניים כרגע. יוסף רוצה לדבר. שיחה חופשית — הישארי בדמות, בעברית בלבד. הגיבי למה שהוא אומר.`
           );
         }
       }, 5000);
@@ -444,22 +402,29 @@ class Orchestrator {
     this.agents.mini.reconnect();
   }
 
+  // DRAFT — opening line direction from Yosef 18.7 ("אז מה קוטלים היום?").
+  // Final wording is his to sign (prompt law).
+  static GREET_NUDGE =
+    'את בשידור. שאלי בעברית, במשפט אחד: "אז מה קוטלים היום? קופירייטינג? ' +
+    'ארט דיירקשן? קונספט? דברו אליי." ואז עצרי וחכי לתשובה. ' +
+    'כשעונים לך — קבעי את העין עם set_mode והמשיכי.';
+
   _greet() {
-    console.log('[Greet] 🎬 START pressed — connecting Mini + auto Go Live for Chapter 1');
+    console.log('[Greet] 🎬 Scan pressed — connecting MiniX + opening question');
     this.debating = true;
     if (!this.agents.mini.ready) {
       this.agents.mini.connect();
       const waitAndSend = () => {
         if (this.agents.mini.ready) {
-          this.agents.mini.send('Chapter 1 — The Volunteer. Say your opening line: "Hey Yosef. What are we roasting today?" Then STOP. Wait for Yosef to answer before saying anything else.');
-          console.log('[Greet] 🎬 Mini connected + Chapter 1 nudge sent');
+          this.agents.mini.send(Orchestrator.GREET_NUDGE);
+          console.log('[Greet] 🎬 MiniX connected + opening nudge sent');
         } else {
           setTimeout(waitAndSend, 200);
         }
       };
       setTimeout(waitAndSend, 500);
     } else {
-      this.agents.mini.send('Chapter 1 — The Volunteer. Say your opening line: "Hey Yosef. What are we roasting today?" Then STOP. Wait for Yosef to answer before saying anything else.');
+      this.agents.mini.send(Orchestrator.GREET_NUDGE);
     }
   }
 
@@ -486,7 +451,7 @@ class Orchestrator {
       if (!hasCritique) {
         console.warn('[NanoBanana] ⚠ Empty critique — image may be generic');
       }
-      const result = await generateRedesign(this.fullCritique || 'Redesign this mobile AI chat app with better UX', this.lastScreenshot);
+      const result = await generateRedesign(this.fullCritique, this.lastScreenshot, this.mode);
       if (result) {
         console.log(`[NanoBanana] ✔ Image ready (${result.mimeType}, ${Math.round(result.data.length / 1024)}KB)`);
         this.broadcast({ event: 'image_result', mimeType: result.mimeType, data: result.data });
@@ -570,8 +535,9 @@ class Orchestrator {
     try {
       const { image_base64, mode } = req.body;
       if (!image_base64) return res.status(400).json({ error: 'image_base64 required' });
+      if (['ui', 'print', 'art'].includes(mode)) this.mode = mode;
 
-      const scan    = await analyzeScreenshot(image_base64, mode);
+      const scan    = await analyzeScreenshot(image_base64, this.mode);
       const latency = Date.now() - t0;
       const issues  = scan.issues || scan;
 
@@ -580,8 +546,8 @@ class Orchestrator {
 
       this.broadcast({ event: 'vision_result', issues, score: scan.score, worst: scan.worst, latency });
 
-      console.log(`[Vision] ${latency}ms → ${issues.length} issues (score:${scan.score}) → feeding Mini [${this.visualState}]`);
-      this.agents.mini.send(miniRoast(issues, this.visualState));
+      console.log(`[Vision] ${latency}ms → ${issues.length} issues (score:${scan.score}) → feeding MiniX [${this.mode}]`);
+      this.agents.mini.send(miniRoast(issues, this.mode));
 
       res.json({ status: 'ok', latency, issueCount: issues.length, visualState: this.visualState });
     } catch (err) {
@@ -595,11 +561,12 @@ class Orchestrator {
   async handleVisionPrefetch(req, res) {
     const { image_base64, mode } = req.body;
     if (!image_base64) return res.status(400).json({ error: 'image_base64 required' });
+    if (['ui', 'print', 'art'].includes(mode)) this.mode = mode;
 
-    console.log(`[Prefetch] Starting vision analysis in background... (mode: ${mode || 'ui'})`);
+    console.log(`[Prefetch] Starting vision analysis in background... (mode: ${this.mode})`);
     const t0 = Date.now();
     try {
-      const scan = await analyzeScreenshot(image_base64, mode);
+      const scan = await analyzeScreenshot(image_base64, this.mode);
       const latency = Date.now() - t0;
       const issues = scan.issues || scan;
       this._prefetchedVision = { issues, score: scan.score, worst: scan.worst, image_base64, latency };
@@ -626,6 +593,7 @@ class Orchestrator {
     return {
       status: 'ok',
       phase: this.phase,
+      mode: this.mode,
       visualState: this.visualState,
       waitingForUser: this.waitingForUser,
       round: this.round,

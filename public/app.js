@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════
-// Mini — live visual-critique instrument (scene-free frontend v2)
+// MiniX — live visual-critique instrument (scene-free frontend v2)
 //
-// Single flow:  idle → scan → Mini roasts (audio + subtitles + red
+// Single flow:  idle → scan → MiniX roasts (audio + subtitles + red
 // marks) → live debate (mic always streaming) → Rebuild → before/after.
 //
 // Speaks the existing server WS/HTTP protocol unchanged, plus:
@@ -83,6 +83,7 @@ function dispatch(ev) {
     case 'audio_chunk':     playPCM(ev.data); break;
     case 'flush_audio':     flushAudio(); break;         // barge-in — user spoke over Mini
     case 'tool_execution':  onTool(ev); break;
+    case 'mode_change':     applyMode(ev.mode); break;   // MiniX chose the eye via set_mode
     case 'vision_result':   onVisionResult(ev); break;
     case 'build_generating':onBuildStart(); break;
     case 'image_result':    onImage(ev); break;
@@ -178,14 +179,18 @@ $('btn-rebuild').addEventListener('click', startRebuild);
 $('btn-reset').addEventListener('click', resetAll);
 
 // ── Mode picker ──
+function applyMode(m) {
+  if (!['ui', 'print', 'art'].includes(m)) return;
+  mode = m;
+  body.dataset.mode = mode;
+  document.querySelectorAll('#modes button').forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+  $('medium-mode').textContent = mode === 'ui' ? 'interface' : mode;
+}
 document.querySelectorAll('#modes button').forEach(btn => {
   btn.addEventListener('click', () => {
-    if (flowState !== 'idle') return;               // lock mode once a critique starts
-    mode = btn.dataset.mode;
-    body.dataset.mode = mode;
-    document.querySelectorAll('#modes button').forEach(b =>
-      b.setAttribute('aria-pressed', String(b === btn)));
-    $('medium-mode').textContent = mode === 'ui' ? 'interface' : mode;
+    if (flowState !== 'idle') return;               // lock manual picks once live (MiniX can still set_mode)
+    applyMode(btn.dataset.mode);
   });
 });
 
@@ -473,10 +478,23 @@ function onImage(ev) {
 }
 function onNanoFailed() {
   console.warn('[Rebuild] Nano Banana failed');
-  // Nothing generated — return to the live critique so the demo continues.
+  // Iron rule: visible failure, never a silent shrug. Say it, then return
+  // to the live critique so the session continues.
+  showNotice('rebuild failed — no image generated');
   status('live');
   setState('live');
   $('btn-rebuild').hidden = false;
+}
+
+// ── Notice: a short, visible failure line (gallery mono, critique red) ──
+let noticeTimer = null;
+function showNotice(text) {
+  const n = $('notice');
+  if (!n) return;
+  n.textContent = text;
+  n.classList.add('visible');
+  clearTimeout(noticeTimer);
+  noticeTimer = setTimeout(() => n.classList.remove('visible'), 6000);
 }
 
 function openReveal() {
