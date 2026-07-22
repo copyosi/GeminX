@@ -406,6 +406,21 @@
     }
     body.state-idle #btn-home { display: none; }
 
+    /* ── Camera flip (bottom-right). Opening is FRONT camera — she
+       faces the person. Turning her to the work/screen is a separate,
+       deliberate act (Yosef 22.7). Hidden when no live camera. ─────── */
+    #btn-flip {
+      position: fixed; z-index: 22;
+      right: calc(var(--safe-r) + var(--edge));
+      bottom: calc(var(--safe-b) + 26px);
+      min-width: 48px; padding: 0 14px; font-size: 16px;
+    }
+    body.state-idle #btn-flip, body.uploaded #btn-flip,
+    body.doc-mode #btn-flip { display: none; }
+
+    /* front camera preview is mirrored, like every selfie view */
+    body.front-cam #video { transform: scaleX(-1); }
+
     /* ── Back-to-critique inside the reveal ──────────────────────── */
     #btn-back-live {
       position: absolute; z-index: 5;
@@ -483,6 +498,7 @@
   </div>
 
   <button id="btn-home" class="btn btn-ghost" aria-label="Home">⌂</button>
+  <button id="btn-flip" class="btn btn-ghost" aria-label="Flip camera">⇄</button>
 
   <div id="verdict" aria-hidden="true">
     <div class="score"><span id="score">—</span><span class="over">/10</span></div>

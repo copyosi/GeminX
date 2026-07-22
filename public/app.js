@@ -180,6 +180,8 @@ function resetAll() {
   $('btn-rebuild').hidden = true;
   $('btn-reset').hidden = true;
   $('reveal').classList.remove('on');
+  // every new session opens FRONT — facing the person (Yosef 22.7)
+  if (stream && stream.getVideoTracks().length && cameraFacing !== 'user') flipCamera();
   send({ event: 'reset' });         // fresh MiniX session on server
 }
 
@@ -333,11 +335,21 @@ document.querySelectorAll('#modes button').forEach(btn => {
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
+// Opening = FRONT camera. She goes live facing the person and the room;
+// turning her to the work/screen is a separate, deliberate flip (Yosef 22.7).
+let cameraFacing = 'user';
+
+const VIDEO_CONSTRAINTS = facing => ({
+  facingMode: { ideal: facing },
+  width: { ideal: 1920 }, height: { ideal: 1080 },
+  frameRate: { ideal: 5, max: 12 },
+});
+
 // Warm up permissions early so the Scan tap is instant (best-effort).
 (async function earlyPermissions() {
   try {
     const s = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' } },
+      video: { facingMode: { ideal: 'user' } },
       audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
     });
     s.getTracks().forEach(t => (t.enabled = false));
@@ -355,7 +367,7 @@ async function startMedia() {
   } else {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 5, max: 12 } },
+        video: VIDEO_CONSTRAINTS(cameraFacing),
         audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: true },
       });
     } catch (e) {
@@ -372,11 +384,35 @@ async function startMedia() {
     video.srcObject = stream;
     try { await video.play(); } catch { /* autoplay policies */ }
     stream.getVideoTracks()[0].onended = () => { setState('idle'); };
+    body.classList.toggle('front-cam', cameraFacing === 'user');
     positionMarks();
   }
   if (stream.getAudioTracks().length) startMicCapture(stream);
   startAudioHealthCheck();
 }
+
+// Deliberate camera flip — front (her, facing the person) ⇄ rear (the work).
+// Mic capture keeps running on the same stream; only video swaps.
+async function flipCamera() {
+  if (!stream || !stream.getVideoTracks().length) return;
+  const next = cameraFacing === 'user' ? 'environment' : 'user';
+  try {
+    const vs = await navigator.mediaDevices.getUserMedia({ video: VIDEO_CONSTRAINTS(next) });
+    stream.getVideoTracks().forEach(t => { t.stop(); stream.removeTrack(t); });
+    const vt = vs.getVideoTracks()[0];
+    stream.addTrack(vt);
+    video.srcObject = null; video.srcObject = stream;
+    try { await video.play(); } catch { /* autoplay policies */ }
+    vt.onended = () => { setState('idle'); };
+    cameraFacing = next;
+    body.classList.toggle('front-cam', cameraFacing === 'user');
+    positionMarks();
+  } catch (e) {
+    console.warn('[Media] camera flip failed:', e.message);
+    showNotice('CAMERA FLIP FAILED');
+  }
+}
+$('btn-flip').addEventListener('click', flipCamera);
 
 // ═══════════════════════════════════════════════════════════════════
 // VISION — screenshot → server (carries mode)
@@ -385,7 +421,16 @@ function grabFrame() {
   if (!video.videoWidth) return null;
   cap.width  = video.videoWidth;
   cap.height = video.videoHeight;
-  cap.getContext('2d').drawImage(video, 0, 0, cap.width, cap.height);
+  const ctx = cap.getContext('2d');
+  if (cameraFacing === 'user') {
+    // Front preview is mirrored — mirror the frame too, so vision
+    // coordinates land where the person actually sees them.
+    ctx.save(); ctx.translate(cap.width, 0); ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0, cap.width, cap.height);
+    ctx.restore();
+  } else {
+    ctx.drawImage(video, 0, 0, cap.width, cap.height);
+  }
   const url = cap.toDataURL('image/jpeg', 0.9);
   lastFrame = url;
   return url.split(',')[1];

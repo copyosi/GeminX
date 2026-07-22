@@ -1,12 +1,23 @@
 // ─── GeminX Prompts — MiniX ──────────────────────────────────────────
-// BASE = Yosef's 17.7 canon (commit d6e13d8, "לא צריך יותר סצינות. זה
-// מיד קטילה") restored after 22.7 finding: my rule-heavy rewrite froze
-// her (silent on questions, repeating the message). Kept from later
-// rounds ONLY what Yosef decided in words: Hebrew on stage, the opening
-// question, venom-with-evidence in one line — plus the minimal tool
-// mechanics. DRAFT — Yosef signs the voice.
+// PROMPT LAW, ENFORCED IN CODE (22.7, after Yosef's justified anger):
+// her VOICE lives in config/voice.he.txt — Yosef's file, Yosef's words,
+// edited only by him or with his explicit signature. When that file
+// exists, it IS the persona. The English block below is only the
+// FALLBACK until his file lands. Code appends MECHANICS (tool wiring)
+// either way — mechanics are not voice.
 
-const MINI = `You are MiniX. A sharp creative director. Aggressively
+const fs = require('fs');
+const path = require('path');
+
+// Tool wiring only — no personality, no tone. Stays out of the voice.
+const MECHANICS = `
+
+[מכניקה — לא אופי]
+- לפני שמדברים על נקודה בעבודה: annotate_at עליה (x/y באחוזים, תווית קצרה).
+- כשעונים לך מה בודקים היום: set_mode (print / ui / art).
+- כשמבקשים ממך לתקן/לבנות מחדש: start_rebuild.`;
+
+const FALLBACK = `You are MiniX. A sharp creative director. Aggressively
 authentic. You critique visual work LIVE — whatever is in front of
 you: a print ad, a poster, an interface, a portfolio page.
 
@@ -65,5 +76,18 @@ One short Hebrew line. Do not repeat the critique.`;
 
 const MINI_CREDITS = `Wrap it up. Be genuine for once — one short
 thank-you. Under 15 words. Hebrew only.`;
+
+// ─── ASSEMBLY ────────────────────────────────────────────────────────
+// voice.he.txt (Yosef's voice, his signature) + MECHANICS (tool wiring).
+// No file → FALLBACK + MECHANICS, and we say so loudly in the log.
+const VOICE_FILE = path.join(__dirname, 'voice.he.txt');
+let MINI;
+if (fs.existsSync(VOICE_FILE)) {
+  MINI = fs.readFileSync(VOICE_FILE, 'utf8').trim() + MECHANICS;
+  console.log(`[prompts] 🎤 Voice loaded from config/voice.he.txt (${MINI.length} chars) — Yosef's file`);
+} else {
+  MINI = FALLBACK + MECHANICS;
+  console.warn('[prompts] ⚠ config/voice.he.txt missing — running on FALLBACK voice (not signed)');
+}
 
 module.exports = { MINI, MINI_LOCKON, MINI_ROAST, MINI_DEFENSE, MINI_BUILD, MINI_CREDITS };
