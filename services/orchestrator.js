@@ -11,8 +11,10 @@ const {
 const { MINI, MINI_LOCKON, MINI_ROAST, MINI_DEFENSE, MINI_BUILD, MINI_CREDITS } = require('../config/prompts');
 const history = require('./history');
 
-// Bidirectional: no forced rounds — Mini flows freely, reacts to room audio
-const ROAST_TIMEOUT_MS = 60000; // 60s safety → auto-transition to BUILD
+// Bidirectional: no forced rounds — MiniX flows freely, reacts to room audio.
+// v2.2: the hackathon 60s roast-safety timer is GONE — it was silently
+// killing the mic after a minute (Yosef's Studio finding: "מתישהו היא
+// שותקת"). She stays alive for the whole session now.
 
 // ─── Visual State Machine ────────────────────────────────────────────────
 const STATE_ORDER = ['main_screen', 'menu_open', 'live_ui'];
@@ -29,6 +31,7 @@ class Orchestrator {
   constructor(httpServer) {
     this.phase         = 'void';
     this.mode          = 'print';   // critique eye: ui | print | art (frontend default: print)
+    this.sessionActive = false;     // true from Scan/greet until New/reset — drives auto-reconnect
     this.visualState   = 'main_screen';
     this.lastIssues    = [];
     this.lastScreenshot = null;
@@ -58,7 +61,9 @@ class Orchestrator {
       onInterrupted:  (n)          => this._onInterrupted(n),
       onUserTranscript: (n, t)     => this._onUserTranscript(n, t),
       onMiniTranscript: (n, t)     => this._onMiniTranscript(n, t),
-      shouldReconnect:  (n)        => this.debating,
+      // Reconnect whenever a session is on — the Live API drops connections
+      // after ~10-15 min; history injection keeps her continuity across it.
+      shouldReconnect:  (n)        => this.sessionActive,
     };
 
     this.agents = {
@@ -77,6 +82,7 @@ class Orchestrator {
     // Reset state on new connection (refresh) so user starts fresh
     this.phase = 'void';
     this.debating = false;
+    this.sessionActive = false;
     this.miniBuffer = '';
     this.fullCritique = '';
     this._openerSent = false;
@@ -111,6 +117,7 @@ class Orchestrator {
       if (d.event === 'reset')          this._reset();
       if (d.event === 'show_me')        this._onShowMe();
       if (d.event === 'rebuild')        this._startBuild();   // v2: frontend triggers Nano Banana redesign
+      if (d.event === 'rescan')         this._onRescan();     // v2.2: new work mid-session — same MiniX, no reconnect
       if (d.event === 'flush_audio')    this._onCut();
     });
 
@@ -229,6 +236,14 @@ class Orchestrator {
   }
 
   _onToolCall(agentName, callId, toolName, args) {
+    // start_rebuild — she can trigger the redesign herself when asked to fix
+    // ("מיני, תקני את זה") — Yosef 22.7: no fix button hunting mid-show.
+    if (toolName === 'start_rebuild') {
+      this.agents[agentName].confirmTool(callId, toolName, { status: 'ok', building: true });
+      console.log('[Tool] 🔨 MiniX triggered the rebuild herself');
+      this._startBuild();
+      return;
+    }
     // set_mode is resolved server-side: MiniX asked what we're killing today,
     // the human answered, she picks the eye. No frontend ack needed.
     if (toolName === 'set_mode') {
@@ -313,10 +328,9 @@ class Orchestrator {
   // ═══════════════════════════════════════════════════════════════════════════
 
   _onRoastComplete() {
-    this.debating = false;
-    clearTimeout(this._debateTimeout);
-    console.log(`[Scene] ✔ Roast done — ${this._turnCount || 0} turns, ${this.fullCritique.length} chars critique`);
-    // Auto-transition removed — build triggered by frontend nav only
+    // v2.2: kept only for API compatibility — nothing forces this anymore.
+    // She stays live until New/reset (Yosef: "היא חיה כל הזמן").
+    console.log(`[Scene] ✔ Roast segment done — ${this._turnCount || 0} turns, ${this.fullCritique.length} chars critique (staying live)`);
   }
 
   _onShowMe() {
@@ -344,15 +358,6 @@ class Orchestrator {
         this._turnCount     = 0;
         this.debating       = true;
 
-        // Safety timeout: 60s → auto-transition to BUILD
-        clearTimeout(this._debateTimeout);
-        this._debateTimeout = setTimeout(() => {
-          if (this.debating) {
-            console.warn(`[Safety] ${ROAST_TIMEOUT_MS / 1000}s timeout — forcing roast complete`);
-            this._onRoastComplete();
-          }
-        }, ROAST_TIMEOUT_MS);
-
         this.broadcast({ event: 'vision_result', issues, score, worst, latency });
         this.agents.mini.send(miniRoast(issues, this.mode));
         return;
@@ -370,15 +375,6 @@ class Orchestrator {
           this._turnCount   = 0;
           this.debating     = true;
 
-          // Safety timeout
-          clearTimeout(this._debateTimeout);
-          this._debateTimeout = setTimeout(() => {
-            if (this.debating) {
-              console.warn(`[Safety] ${ROAST_TIMEOUT_MS / 1000}s timeout — forcing roast complete`);
-              this._onRoastComplete();
-            }
-          }, ROAST_TIMEOUT_MS);
-
           this.agents.mini.send(
             `אין עבודה מול העיניים כרגע. יוסף רוצה לדבר. שיחה חופשית — הישארי בדמות, בעברית בלבד. הגיבי למה שהוא אומר.`
           );
@@ -387,10 +383,36 @@ class Orchestrator {
     }, 2500); // chapter card visible for 2.5s
   }
 
+  // ─── RESCAN — new work mid-session: same MiniX, full continuity ────────
+  // Yosef 22.7: "היא חייבת לשמור על המשכיות גם אם אני מעלה תמונה חדשה".
+  // Consumes a fresh vision prefetch and hands her the new targets WITHOUT
+  // reconnecting — her session, memory and mic stay exactly as they are.
+  _onRescan() {
+    if (!this._prefetchedVision) {
+      console.warn('[Rescan] no prefetched vision — ignoring');
+      return;
+    }
+    const { issues, score, worst, image_base64, latency } = this._prefetchedVision;
+    this._prefetchedVision = null;
+    this.lastIssues    = issues;
+    this.lastScreenshot = image_base64;
+    this.debating      = true;
+    this.phase         = 'roast';
+    console.log(`[Rescan] 🔁 New work, same MiniX — ${issues.length} targets (score:${score})`);
+    this.broadcast({ event: 'vision_result', issues, score, worst, latency });
+    if (this.agents.mini.alive) {
+      this.agents.mini.send(
+        `עבודה חדשה הוחלפה מול העיניים שלך — אותו סשן, המשיכי ברצף.\n\n` +
+        miniRoast(issues, this.mode)
+      );
+    }
+  }
+
   _reset() {
     console.log('[Reset] 🔄 Full session reset — reconnecting Mini');
     this.phase = 'void';
     this.debating = false;
+    this.sessionActive = false;
     this.miniBuffer = '';
     this.fullCritique = '';
     this._openerSent = false;
@@ -412,6 +434,7 @@ class Orchestrator {
   _greet() {
     console.log('[Greet] 🎬 Scan pressed — connecting MiniX + opening question');
     this.debating = true;
+    this.sessionActive = true;
     if (!this.agents.mini.ready) {
       this.agents.mini.connect();
       const waitAndSend = () => {
@@ -433,9 +456,10 @@ class Orchestrator {
 
     setTimeout(() => {
       this._setPhase('build');
-      this.debating = false;
+      // v2.2: debating stays TRUE — she remains live through and after the
+      // rebuild (the old =false here muted the mic permanently).
 
-      // Nano Banana — generate redesigned UI image
+      // Nano Banana — generate redesigned image
       this.broadcast({ event: 'build_generating' });
       this._generateImage();
 

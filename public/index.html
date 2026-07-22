@@ -366,6 +366,31 @@
     }
     .doc-issue[dir="rtl"] { text-align: right; }
 
+    /* ── Voice bars: her speech, made visible ───────────────────── */
+    #voicebars { display: inline-flex; gap: 2px; align-items: center; height: 14px; margin-left: 2px; opacity: 0; transition: opacity 250ms ease; }
+    body.voice-on #voicebars { opacity: 1; }
+    #voicebars i {
+      width: 2px; height: 3px; background: var(--red); border-radius: 1px;
+      box-shadow: 0 0 4px var(--red-glow);
+      transition: height 90ms ease;
+    }
+
+    /* ── Home button (bottom-left) ───────────────────────────────── */
+    #btn-home {
+      position: fixed; z-index: 22;
+      left: calc(var(--safe-l) + var(--edge));
+      bottom: calc(var(--safe-b) + 26px);
+      min-width: 48px; padding: 0 14px; font-size: 16px;
+    }
+    body.state-idle #btn-home { display: none; }
+
+    /* ── Back-to-critique inside the reveal ──────────────────────── */
+    #btn-back-live {
+      position: absolute; z-index: 5;
+      left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--safe-b) + 22px);
+    }
+
     /* ── Notice: visible failure line (iron rule: no silent errors) ── */
     #notice {
       position: fixed; z-index: 23;
@@ -430,9 +455,12 @@
   </header>
 
   <div id="status">
+    <span id="voicebars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
     <span id="live-dot"></span>
     <span id="status-text">ready</span>
   </div>
+
+  <button id="btn-home" class="btn btn-ghost" aria-label="Home">⌂</button>
 
   <div id="verdict" aria-hidden="true">
     <div class="score"><span id="score">—</span><span class="over">/10</span></div>
@@ -467,6 +495,7 @@
     <div id="rv-handle"></div>
     <div class="rv-label rv-before-label">Before</div>
     <div class="rv-label rv-after-label">After</div>
+    <button id="btn-back-live" class="btn">Back to critique</button>
   </div>
 
   <canvas id="cap"></canvas>

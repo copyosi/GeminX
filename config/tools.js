@@ -19,6 +19,11 @@ module.exports = [{
       }
     },
     {
+      name: 'start_rebuild',
+      description: 'Start the Nano Banana redesign of the work being critiqued. Call this when the human asks you to fix/redesign it ("תקני", "תבני מחדש", "fix it") or when you finish the roast and offer a fix and they agree. Never call it uninvited mid-roast.',
+      parameters: { type: 'OBJECT', properties: {}, required: [] }
+    },
+    {
       name: 'set_mode',
       description: 'Set which critique eye you are wearing. Call this once at the start, right after the human answers your opening question about what we are killing today (copywriting/print → print, interface/app → ui, art direction/concept/storyboard → art). Call again only if the subject changes.',
       parameters: {

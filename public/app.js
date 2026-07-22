@@ -152,7 +152,7 @@ function startRebuild() {
   nanoReady = false;
   clearMarks();
   hideSubtitle();
-  body.classList.remove('mic-live');
+  // mic-live STAYS on — she remains alive through the rebuild (v2.2)
   $('btn-rebuild').hidden = true;
   captureBefore();
   send({ event: 'rebuild' });       // → orchestrator._startBuild() → Nano Banana
@@ -162,6 +162,7 @@ function resetAll() {
   setState('idle');
   status('ready');
   greetDone = false; showMeSent = false; nanoReady = false;
+  pendingMarks = [];
   clearTimeout(showMeFallbackTimer);
   flushAudio();
   clearMarks();
@@ -185,7 +186,19 @@ function resetAll() {
 // ═══════════════════════════════════════════════════════════════════
 // UPLOAD — print image, or campaign PDF / DOCX (copy & scripts)
 // ═══════════════════════════════════════════════════════════════════
-$('btn-upload').addEventListener('click', () => { if (flowState === 'idle') $('file-in').click(); });
+$('btn-upload').addEventListener('click', () => {
+  if (flowState === 'idle' || flowState === 'live' || flowState === 'reveal') $('file-in').click();
+});
+$('btn-home').addEventListener('click', resetAll);
+$('btn-back-live').addEventListener('click', () => {
+  // Reveal → back to the live critique. Server-side she never stopped.
+  $('reveal').classList.remove('on');
+  setState('live');
+  status('live');
+  body.classList.add('mic-live');
+  $('btn-rebuild').hidden = docMode;
+  $('btn-reset').hidden = false;
+});
 $('file-in').addEventListener('change', e => {
   const f = e.target.files && e.target.files[0];
   if (f) handleUpload(f);
@@ -200,7 +213,8 @@ function fileKind(f) {
 }
 
 async function handleUpload(file) {
-  if (flowState !== 'idle') return;
+  if (flowState === 'scanning' || flowState === 'rebuilding') return;
+  const midSession = flowState === 'live' || flowState === 'reveal';
   const kind = fileKind(file);
   if (!kind) { showNotice('unsupported file — image, pdf or docx'); return; }
   if (file.size > 11 * 1024 * 1024) { showNotice('file too large — max 11mb'); return; }
@@ -213,14 +227,17 @@ async function handleUpload(file) {
   });
   const b64 = String(dataURL).split(',')[1];
 
-  setState('scanning');
-  status('scanning');
+  if (!midSession) { setState('scanning'); status('scanning'); }
   hideVerdict();
   clearMarks();
+  $('reveal').classList.remove('on');
   ensureAudioCtx();
   await startAudioOnly();            // mic for the live debate — no camera needed
 
   if (kind === 'image') {
+    docMode = false;
+    body.classList.remove('doc-mode');
+    $('docsheet').innerHTML = '';
     uploadedB64 = b64;
     lastFrame = dataURL;             // the "before" plate for rebuild
     const img = $('upload-img');
@@ -232,9 +249,13 @@ async function handleUpload(file) {
     body.classList.add('doc-mode');
   }
 
-  // Connect MiniX + greet, then feed the scan (same protocol as camera).
-  greetDone = false; showMeSent = false;
-  send({ event: 'greet' });
+  // First work: connect MiniX (greet). Mid-session: NO reconnect — she
+  // keeps her memory and mic; the server gets a `rescan` instead
+  // (Yosef 22.7: continuity even when a new work replaces the old one).
+  if (!midSession) {
+    greetDone = false; showMeSent = false;
+    send({ event: 'greet' });
+  }
 
   try {
     if (kind === 'image') {
@@ -251,10 +272,18 @@ async function handleUpload(file) {
   } catch (err) {
     console.warn('[Upload] critique request failed:', err.message);
     showNotice('scan failed — check connection');
+    return;
   }
 
-  clearTimeout(showMeFallbackTimer);
-  showMeFallbackTimer = setTimeout(() => { if (!showMeSent) sendShowMe(); }, 5000);
+  if (midSession) {
+    send({ event: 'rescan' });
+    setState('live');
+    status('live');
+    body.classList.add('mic-live');
+  } else {
+    clearTimeout(showMeFallbackTimer);
+    showMeFallbackTimer = setTimeout(() => { if (!showMeSent) sendShowMe(); }, 5000);
+  }
 }
 
 // Mic-only capture for uploaded work (camera stays off).
@@ -377,6 +406,12 @@ async function prefetchVision(attempt = 0) {
 // ═══════════════════════════════════════════════════════════════════
 // VISION RESULT — verdict + first pass of red marks
 // ═══════════════════════════════════════════════════════════════════
+// Scan marks are held PENDING and revealed only in sync with her speech
+// (Yosef 22.7: marks and voice must land together). Her annotate_at calls
+// are the primary channel; transcript-matching reveals the scan marks she
+// talks about without pointing.
+let pendingMarks = [];
+
 function onVisionResult(ev) {
   const issues = ev.issues || [];
   showVerdict(ev.score, ev.worst);
@@ -384,14 +419,24 @@ function onVisionResult(ev) {
     // Written material — the quotes ARE the marks.
     renderDocSheet(issues);
   } else {
-    // Drop quiet marks where the scan found issues; MiniX emphasizes them
-    // live as she points via annotate_at.
     clearMarks();
-    issues.slice(0, 5).forEach((iss, i) => {
-      setTimeout(() => addMark(iss.x, iss.y, iss.label, 'scan'), 260 * i);
-    });
+    pendingMarks = issues.slice(0, 5).map(iss => ({ ...iss, shown: false }));
   }
   if (flowState === 'scanning') setState('live');
+}
+
+// Reveal a pending scan mark when her words match its label/detail.
+function syncMarksToSpeech(text) {
+  if (!text || !pendingMarks.length) return;
+  for (const m of pendingMarks) {
+    if (m.shown) continue;
+    const tokens = `${m.label || ''} ${m.detail || ''}`
+      .split(/[^֐-׿A-Za-z0-9]+/).filter(w => w.length >= 4);
+    if (tokens.some(w => text.includes(w))) {
+      m.shown = true;
+      addMark(m.x, m.y, m.label, 'scan');
+    }
+  }
 }
 
 // ── Doc sheet: quoted lines from an uploaded campaign/script ──
@@ -435,9 +480,8 @@ function showVerdict(score, worst) {
   $('verdict').setAttribute('aria-hidden', 'false');
   body.classList.add('has-verdict');
   // Offer the Rebuild action once there's a critique on the table.
-  // (No rebuild for written material — Nano Banana rebuilds images.)
+  // Upload STAYS visible — a new work mid-session keeps the same MiniX.
   $('btn-scan').hidden = true;
-  $('btn-upload').hidden = true;
   $('btn-rebuild').hidden = docMode;
   $('btn-reset').hidden = false;
 }
@@ -577,6 +621,8 @@ function isRTL(t) { return /[֐-׿؀-ۿ]/.test(t || ''); }
 
 function showSubtitle(text) {
   if (!text) return;
+  syncMarksToSpeech(text);
+  positionSubtitles();
   subSentence += text;
   const trimmed = subSentence.trim();
 
@@ -598,6 +644,24 @@ function showSubtitle(text) {
   clearTimeout(subTimer);
   subTimer = setTimeout(() => { subtitles.classList.remove('visible'); subSentence = ''; }, 11000);
 }
+// Keep her words OFF the artwork: if the letterboxed exhibit leaves ≥70px
+// of black mat below it, the subtitles sit there instead of on the visual.
+function positionSubtitles() {
+  try {
+    const r = videoContentRect();
+    const stageH = window.innerHeight;
+    const below = stageH - r.top - r.height;
+    if (below >= 70) {
+      subtitles.style.bottom = 'auto';
+      subtitles.style.top = Math.min(r.top + r.height + 8, stageH - 64) + 'px';
+    } else {
+      subtitles.style.top = 'auto';
+      subtitles.style.bottom = '';
+    }
+  } catch { /* default position */ }
+}
+window.addEventListener('resize', positionSubtitles);
+
 function fadeSubtitle() {
   clearTimeout(subTimer);
   subTimer = setTimeout(() => { subtitles.classList.remove('visible'); subSentence = ''; }, 5000);
@@ -749,6 +813,7 @@ function ensureAudioCtx() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
     outGain = audioCtx.createGain(); outGain.gain.value = 3.0;   // volume boost
     outGain.connect(audioCtx.destination);
+    startVoiceMeter();
   }
   if (audioCtx.state === 'suspended' && !resuming) {
     resuming = true;
@@ -799,6 +864,34 @@ function flushAudio() {
   pcmQueue.length = 0;
   for (const s of activeSources) { try { s.stop(); } catch {} }
   activeSources = []; nextStart = 0;
+}
+
+// ── Voice bars — her speech, made visible (Yosef 22.7: "תמיד מרשים") ──
+let voiceAnalyser = null;
+function startVoiceMeter() {
+  if (voiceAnalyser || !audioCtx || !outGain) return;
+  voiceAnalyser = audioCtx.createAnalyser();
+  voiceAnalyser.fftSize = 64;
+  voiceAnalyser.smoothingTimeConstant = 0.6;
+  outGain.connect(voiceAnalyser);
+  const bars = document.querySelectorAll('#voicebars i');
+  const data = new Uint8Array(voiceAnalyser.frequencyBinCount);
+  let quietFrames = 0;
+  (function loop() {
+    requestAnimationFrame(loop);
+    if (!bars.length) return;
+    voiceAnalyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i];
+    const level = sum / (data.length * 255);           // 0..1
+    if (level > 0.02) { quietFrames = 0; body.classList.add('voice-on'); }
+    else if (++quietFrames > 30) body.classList.remove('voice-on');
+    bars.forEach((b, i) => {
+      const bin = Math.min(data.length - 1, 2 + i * 4);
+      const h = 3 + Math.round((data[bin] / 255) * 11);
+      b.style.height = h + 'px';
+    });
+  })();
 }
 
 // iOS randomly suspends the context — keep it alive.
