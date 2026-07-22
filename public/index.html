@@ -82,6 +82,28 @@
     body.uploaded #upload-img { display: block; }
     body.uploaded #video { visibility: hidden; }
 
+    /* Split layout for uploaded work — the visual stops owning the screen
+       (Yosef 22.7). Landscape: work left, her space right. Portrait: work
+       top, her space below. Camera mode is untouched. */
+    @media (orientation: landscape) {
+      body.uploaded #upload-img { width: 62%; border-right: 1px solid var(--hair); }
+      body.uploaded #verdict {
+        right: calc(var(--safe-r) + var(--edge)); left: auto;
+        bottom: auto; top: calc(var(--safe-t) + 96px);
+      }
+      body.uploaded #subtitles {
+        left: 64%; right: calc(var(--safe-r) + var(--edge));
+        width: auto; transform: none;
+        bottom: calc(var(--safe-b) + 120px);
+        text-align: right;
+      }
+    }
+    @media (orientation: portrait) {
+      body.uploaded #upload-img { height: 60%; border-bottom: 1px solid var(--hair); }
+      body.uploaded #subtitles { bottom: calc(var(--safe-b) + 150px); }
+      body.uploaded #verdict { bottom: calc(var(--safe-b) + 240px); }
+    }
+
     /* soft gallery vignette — grounds the mat, no decoration */
     #stage::after {
       content: ""; position: absolute; inset: 0; z-index: 4;

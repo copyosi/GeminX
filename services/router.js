@@ -132,8 +132,8 @@ function miniRoastContinue(miniPrevious, visualState, history) {
 // ─── CLOSE — Transition to BUILD ────────────────────────────────────
 
 function miniClose() {
-  return `הרוסט נגמר. משפט אחד בעברית: מה הדבר האחד שחייב להשתנות —
-ושנאנו-בננה כבר עובדת על זה.`;
+  return `הרידיזיין נבנה עכשיו. משפט אחד קצר בלבד — ואסור לחזור על
+ביקורת שכבר אמרת.`;
 }
 
 module.exports = {

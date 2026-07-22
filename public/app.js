@@ -254,7 +254,9 @@ async function handleUpload(file) {
   // (Yosef 22.7: continuity even when a new work replaces the old one).
   if (!midSession) {
     greetDone = false; showMeSent = false;
-    send({ event: 'greet' });
+    // Uploaded work = the eye is already known — she skips the opening
+    // question and goes straight to the kill (Yosef 22.7).
+    send({ event: 'greet', hasWork: true, mode: kind === 'image' ? mode : 'copy' });
   }
 
   try {
@@ -647,6 +649,11 @@ function showSubtitle(text) {
 // Keep her words OFF the artwork: if the letterboxed exhibit leaves ≥70px
 // of black mat below it, the subtitles sit there instead of on the visual.
 function positionSubtitles() {
+  // Uploaded works use the CSS split layout — JS keeps its hands off.
+  if (body.classList.contains('uploaded')) {
+    subtitles.style.top = ''; subtitles.style.bottom = '';
+    return;
+  }
   try {
     const r = videoContentRect();
     const stageH = window.innerHeight;

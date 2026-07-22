@@ -67,9 +67,12 @@ class Agent {
     if (this._audioChunks % 250 === 1) {
       console.log(`[${this.name}] 🎤→API chunk #${this._audioChunks} (${base64PCM.length} b64 chars)`);
     }
+    // Typed field, NOT legacy mediaChunks — the legacy field triggers
+    // 1007 "CONTENT_TYPE_AUDIO not supported" disconnects (lesson already
+    // documented in Eddy3's architecture notes; reproduced here 22.7).
     this.ws.send(JSON.stringify({
       realtimeInput: {
-        mediaChunks: [{ data: base64PCM, mimeType: 'audio/pcm;rate=16000' }]
+        audio: { data: base64PCM, mimeType: 'audio/pcm;rate=16000' }
       }
     }));
   }
@@ -127,6 +130,7 @@ class Agent {
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.voice } } }
           },
           outputAudioTranscription: {},
+          inputAudioTranscription: {},
           // Bidirectional: server-side VAD — Mini hears user + interrupts on speech
           realtimeInputConfig: {
             automaticActivityDetection: {
@@ -178,6 +182,7 @@ class Agent {
     if (msg.setupComplete) {
       this.ready = true;
       console.log(`[${this.name}] ✔ ready (${this.voice})`);
+      this.cb.onReady?.(this.name);
       return;
     }
 
@@ -228,16 +233,21 @@ class Agent {
       this.cb.onMiniTranscript?.(this.name, t);
     }
 
-    // inputTranscript — what the API heard from user
+    // inputTranscript / inputTranscription — what the API heard from user
     if (msg.serverContent?.inputTranscript) {
       const t = msg.serverContent.inputTranscript;
       console.log(`[${this.name}] 👂 USER SAID: "${t}"`);
       this.cb.onUserTranscript?.(this.name, t);
     }
+    if (msg.serverContent?.inputTranscription?.text) {
+      const t = msg.serverContent.inputTranscription.text;
+      console.log(`[${this.name}] 👂 HEARD: "${t}"`);
+      this.cb.onUserTranscript?.(this.name, t);
+    }
 
     // Log other unhandled fields
     if (msg.serverContent) {
-      const known = ['modelTurn','turnComplete','interrupted','outputTranscript','inputTranscript','generationComplete'];
+      const known = ['modelTurn','turnComplete','interrupted','outputTranscript','inputTranscript','outputTranscription','inputTranscription','generationComplete'];
       const keys = Object.keys(msg.serverContent).filter(k => !known.includes(k));
       if (keys.length > 0) {
         console.log(`[${this.name}] 📋 extra:`, JSON.stringify(Object.fromEntries(keys.map(k => [k, msg.serverContent[k]])), null, 0).slice(0, 200));

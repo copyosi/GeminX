@@ -61,8 +61,10 @@ class Orchestrator {
       onInterrupted:  (n)          => this._onInterrupted(n),
       onUserTranscript: (n, t)     => this._onUserTranscript(n, t),
       onMiniTranscript: (n, t)     => this._onMiniTranscript(n, t),
+      onReady:          (n)        => this._onAgentReady(n),
       // Reconnect whenever a session is on — the Live API drops connections
-      // after ~10-15 min; history injection keeps her continuity across it.
+      // (1011 internal errors, ~10-15 min limits); history injection keeps
+      // her continuity across it.
       shouldReconnect:  (n)        => this.sessionActive,
     };
 
@@ -112,7 +114,7 @@ class Orchestrator {
       if (d.event === 'tool_completed') this._resolveTool(d.callId, d.toolName, d.status);
       if (d.event === 'advance_scene')  this._advanceScene();
       if (d.event === 'audio_input')    this._routeAudio(d.data);
-      if (d.event === 'greet')          this._greet();
+      if (d.event === 'greet')          this._greet(d.hasWork ? d.mode : null);
       if (d.event === 'go_live_manual') this._onUserTranscript('manual', 'Go Live');
       if (d.event === 'reset')          this._reset();
       if (d.event === 'show_me')        this._onShowMe();
@@ -223,6 +225,9 @@ class Orchestrator {
   }
 
   _onMiniTranscript(agentName, text) {
+    // Strip leaked model control tokens (<ctrl46> etc.) — they were
+    // reaching the subtitles after rescan (Yosef 22.7 / reproduced live).
+    if (text) text = text.replace(/<ctrl\d+>/g, '');
     if (text && text.trim()) {
       // Log what MiniX says — this is the deploy log
       console.log(`[LIVE] 🗣 MiniX: "${text.trim().slice(0, 200)}"`);
@@ -235,13 +240,30 @@ class Orchestrator {
     }
   }
 
+  // ─── Reconnect resume — the Live API dies mid-session (1011); when she
+  // comes back she must pick up where she was, not sit silent. ──────────
+  _onAgentReady(agentName) {
+    if (!this.sessionActive || !this._openerSent) return;   // fresh session — greet flow handles it
+    if (this._resuming) return;
+    this._resuming = true;
+    setTimeout(() => { this._resuming = false; }, 3000);
+    const targets = this.lastIssues?.length
+      ? `\n\nהמטרות שעל השולחן:\n${require('./router').humanizeIssues(this.lastIssues)}`
+      : '';
+    console.log('[Resume] 🔁 Reconnected mid-session — sending resume nudge');
+    this.agents.mini.send(
+      `החיבור התחדש באמצע סשן חי. אל תפתחי מחדש ואל תשאלי כלום — ` +
+      `המשיכי בדיוק מאיפה שהיית, בעברית. אם נשאלת שאלה — עני עליה עכשיו.${targets}`
+    );
+  }
+
   _onToolCall(agentName, callId, toolName, args) {
     // start_rebuild — she can trigger the redesign herself when asked to fix
     // ("מיני, תקני את זה") — Yosef 22.7: no fix button hunting mid-show.
     if (toolName === 'start_rebuild') {
       this.agents[agentName].confirmTool(callId, toolName, { status: 'ok', building: true });
       console.log('[Tool] 🔨 MiniX triggered the rebuild herself');
-      this._startBuild();
+      this._startBuild(true);   // quiet: she already announces it herself
       return;
     }
     // set_mode is resolved server-side: MiniX asked what we're killing today,
@@ -400,9 +422,11 @@ class Orchestrator {
     this.phase         = 'roast';
     console.log(`[Rescan] 🔁 New work, same MiniX — ${issues.length} targets (score:${score})`);
     this.broadcast({ event: 'vision_result', issues, score, worst, latency });
+    this._workNo = (this._workNo || 1) + 1;
     if (this.agents.mini.alive) {
       this.agents.mini.send(
-        `עבודה חדשה הוחלפה מול העיניים שלך — אותו סשן, המשיכי ברצף.\n\n` +
+        `עבודה מספר ${this._workNo} — חדשה לגמרי. המודעה הקודמת ירדה מהשולחן: ` +
+        `אל תזכירי אותה ואל תחזרי אליה. מעכשיו את מדברת רק על העבודה החדשה.\n\n` +
         miniRoast(issues, this.mode)
       );
     }
@@ -431,15 +455,27 @@ class Orchestrator {
     'ארט דיירקשן? קונספט? דברו אליי." ואז עצרי וחכי לתשובה. ' +
     'כשעונים לך — קבעי את העין עם set_mode והמשיכי.';
 
-  _greet() {
-    console.log('[Greet] 🎬 Scan pressed — connecting MiniX + opening question');
+  // When the work was UPLOADED, the eye is already chosen — no opening
+  // question, no waiting (Yosef 22.7: she stalled waiting for an answer
+  // while the ad was already on the table).
+  static GREET_WITH_WORK = (modeLabel) =>
+    `את בשידור, והעבודה כבר מולך (${modeLabel}). בלי שאלות פתיחה — ` +
+    `משפט פתיחה קצר אחד בעברית, וברגע שמגיעות המטרות: קטלי.`;
+
+  _greet(workMode = null) {
+    console.log(`[Greet] 🎬 Scan pressed — connecting MiniX${workMode ? ` (work already on the table: ${workMode})` : ' + opening question'}`);
     this.debating = true;
     this.sessionActive = true;
+    if (workMode && ['ui', 'print', 'art', 'copy'].includes(workMode)) this.mode = workMode;
+    const LABELS = { ui: 'ממשק', print: 'מודעת פרינט', art: 'עבודה ויזואלית', copy: 'חומר כתוב' };
+    const nudge = workMode
+      ? Orchestrator.GREET_WITH_WORK(LABELS[workMode] || 'עבודה')
+      : Orchestrator.GREET_NUDGE;
     if (!this.agents.mini.ready) {
       this.agents.mini.connect();
       const waitAndSend = () => {
         if (this.agents.mini.ready) {
-          this.agents.mini.send(Orchestrator.GREET_NUDGE);
+          this.agents.mini.send(nudge);
           console.log('[Greet] 🎬 MiniX connected + opening nudge sent');
         } else {
           setTimeout(waitAndSend, 200);
@@ -447,11 +483,13 @@ class Orchestrator {
       };
       setTimeout(waitAndSend, 500);
     } else {
-      this.agents.mini.send(Orchestrator.GREET_NUDGE);
+      this.agents.mini.send(nudge);
     }
   }
 
-  _startBuild() {
+  _startBuild(quiet = false) {
+    if (this._building) { console.log('[Build] already building — ignoring re-trigger'); return; }
+    this._building = true;
     this._showChapter('rebuild');
 
     setTimeout(() => {
@@ -463,7 +501,9 @@ class Orchestrator {
       this.broadcast({ event: 'build_generating' });
       this._generateImage();
 
-      this.agents.mini.send(miniClose());
+      // When SHE triggered it (start_rebuild) she announces it herself —
+      // no extra nudge, so she never repeats the message (Yosef 22.7).
+      if (!quiet) this.agents.mini.send(miniClose());
     }, 2500);
   }
 
@@ -486,6 +526,8 @@ class Orchestrator {
     } catch (err) {
       console.error('[NanoBanana] ✖', err.message);
       this.broadcast({ event: 'nano_banana_failed' });
+    } finally {
+      this._building = false;
     }
   }
 
