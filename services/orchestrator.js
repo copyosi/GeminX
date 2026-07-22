@@ -251,11 +251,17 @@ class Orchestrator {
       ? `\n\nהמטרות שעל השולחן:\n${require('./router').humanizeIssues(this.lastIssues)}`
       : '';
     console.log('[Resume] 🔁 Reconnected mid-session — sending resume nudge');
-    this.agents.mini.send(
-      `החיבור התחדש באמצע סשן חי. אל תפתחי מחדש ואל תשאלי כלום — ` +
-      `המשיכי בדיוק מאיפה שהיית, בעברית. אם נשאלת שאלה — עני עליה עכשיו.${targets}`
-    );
+    this.agents.mini.send(Orchestrator.RESUME_NUDGE(targets));
   }
+
+  // Single source of truth — shown as-is in the control room.
+  static RESUME_NUDGE = (targets) =>
+    `החיבור התחדש באמצע סשן חי. אל תפתחי מחדש ואל תשאלי כלום — ` +
+    `המשיכי בדיוק מאיפה שהיית, בעברית. אם נשאלת שאלה — עני עליה עכשיו.${targets}`;
+
+  static RESCAN_NUDGE = (n) =>
+    `עבודה מספר ${n} — חדשה לגמרי. המודעה הקודמת ירדה מהשולחן: ` +
+    `אל תזכירי אותה ואל תחזרי אליה. מעכשיו את מדברת רק על העבודה החדשה.`;
 
   _onToolCall(agentName, callId, toolName, args) {
     // start_rebuild — she can trigger the redesign herself when asked to fix
@@ -425,9 +431,7 @@ class Orchestrator {
     this._workNo = (this._workNo || 1) + 1;
     if (this.agents.mini.alive) {
       this.agents.mini.send(
-        `עבודה מספר ${this._workNo} — חדשה לגמרי. המודעה הקודמת ירדה מהשולחן: ` +
-        `אל תזכירי אותה ואל תחזרי אליה. מעכשיו את מדברת רק על העבודה החדשה.\n\n` +
-        miniRoast(issues, this.mode)
+        Orchestrator.RESCAN_NUDGE(this._workNo) + '\n\n' + miniRoast(issues, this.mode)
       );
     }
   }

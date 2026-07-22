@@ -418,6 +418,17 @@
     body.state-idle #btn-flip, body.uploaded #btn-flip,
     body.doc-mode #btn-flip { display: none; }
 
+    /* ── Control room (idle only, bottom-right) ──────────────────── */
+    #btn-control {
+      position: fixed; z-index: 22;
+      right: calc(var(--safe-r) + var(--edge));
+      bottom: calc(var(--safe-b) + 26px);
+      min-width: 48px; padding: 0 14px; font-size: 16px;
+      display: none; align-items: center; justify-content: center;
+      text-decoration: none; line-height: 44px;
+    }
+    body.state-idle #btn-control { display: inline-flex; }
+
     /* front camera preview is mirrored, like every selfie view */
     body.front-cam #video { transform: scaleX(-1); }
 
@@ -499,6 +510,7 @@
 
   <button id="btn-home" class="btn btn-ghost" aria-label="Home">⌂</button>
   <button id="btn-flip" class="btn btn-ghost" aria-label="Flip camera">⇄</button>
+  <a id="btn-control" class="btn btn-ghost" href="/control.html" aria-label="Control room">⚙</a>
 
   <div id="verdict" aria-hidden="true">
     <div class="score"><span id="score">—</span><span class="over">/10</span></div>

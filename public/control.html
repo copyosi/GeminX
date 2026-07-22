@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>MiniX — חדר בקרה</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <style>
+    :root {
+      --bg: #060607; --panel: #0d0d10; --line: #1c1c22;
+      --ink: #e8e6e1; --ink-soft: #a5a29b; --dim: #55534e;
+      --red: #e03131; --red-glow: rgba(224,49,49,0.35);
+      --green: #37b24d;
+      --mono: 'SF Mono', ui-monospace, Menlo, monospace;
+      --sans: -apple-system, 'Segoe UI', 'Heebo', sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--ink); font-family: var(--sans); min-height: 100vh; }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 28px 18px 90px; }
+
+    header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+    .wordmark { font-size: 26px; font-weight: 800; letter-spacing: 0.02em; }
+    .wordmark b { color: var(--red); }
+    .sub { font-family: var(--mono); font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); }
+    .law { font-size: 13px; color: var(--ink-soft); border-right: 2px solid var(--red); padding: 6px 12px 6px 0; margin: 14px 0 26px; line-height: 1.6; }
+
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-bottom: 22px; }
+    h2 { font-size: 15px; font-weight: 700; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .src { font-family: var(--mono); font-size: 10px; color: var(--dim); direction: ltr; }
+    .chip { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; padding: 3px 9px; border-radius: 3px; text-transform: uppercase; }
+    .chip.signed { background: rgba(55,178,77,0.12); color: var(--green); border: 1px solid rgba(55,178,77,0.4); }
+    .chip.fallback { background: rgba(224,49,49,0.10); color: var(--red); border: 1px solid rgba(224,49,49,0.4); }
+    .when { font-size: 12px; color: var(--ink-soft); margin-bottom: 8px; }
+
+    pre, textarea {
+      width: 100%; background: #0a0a0c; border: 1px solid var(--line); border-radius: 6px;
+      color: var(--ink); font-family: var(--mono); font-size: 12.5px; line-height: 1.65;
+      padding: 12px; white-space: pre-wrap; word-break: break-word; direction: rtl; text-align: right;
+    }
+    pre.en { direction: ltr; text-align: left; }
+    textarea { min-height: 300px; resize: vertical; }
+    textarea:focus { outline: none; border-color: var(--red); }
+
+    .btn {
+      background: none; border: 1px solid var(--line); border-radius: 5px; color: var(--ink);
+      font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; padding: 9px 18px;
+      cursor: pointer; transition: all 150ms ease;
+    }
+    .btn:hover { border-color: var(--ink-soft); }
+    .btn.primary { border-color: var(--red); color: var(--red); }
+    .btn.primary:hover { background: var(--red); color: #fff; box-shadow: 0 0 18px var(--red-glow); }
+    .row { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+    .hintline { font-size: 12px; color: var(--dim); }
+    .ok { color: var(--green); } .err { color: var(--red); }
+
+    .nudge { border-top: 1px dashed var(--line); padding-top: 14px; margin-top: 14px; }
+    .nudge:first-of-type { border-top: none; margin-top: 6px; padding-top: 0; }
+    .nudge h3 { font-size: 13.5px; margin-bottom: 2px; }
+
+    /* chat */
+    #chat-log { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; padding: 4px 2px; margin-bottom: 12px; }
+    .msg { max-width: 88%; padding: 10px 13px; border-radius: 8px; font-size: 13.5px; line-height: 1.6; white-space: pre-wrap; }
+    .msg.me   { align-self: flex-start; background: #131318; border: 1px solid var(--line); }
+    .msg.her  { align-self: flex-end; background: rgba(224,49,49,0.07); border: 1px solid rgba(224,49,49,0.25); }
+    .msg.sys  { align-self: center; font-family: var(--mono); font-size: 11px; color: var(--dim); background: none; }
+    .msg .who { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim); display: block; margin-bottom: 4px; }
+    .msg.her .who { color: var(--red); }
+    #chat-input { min-height: 76px; }
+    .toggle { display: inline-flex; border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+    .toggle button { background: none; border: none; color: var(--ink-soft); font-family: var(--mono); font-size: 11px; padding: 8px 14px; cursor: pointer; }
+    .toggle button.on { background: var(--red); color: #fff; }
+    .spin { display: inline-block; animation: sp 1s linear infinite; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+
+    a.back { position: fixed; top: 16px; left: 16px; color: var(--dim); text-decoration: none; font-family: var(--mono); font-size: 12px; }
+    a.back:hover { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <a class="back" href="/">← לבמה</a>
+  <div class="wrap">
+    <header>
+      <div class="wordmark">Mini<b>X</b></div>
+      <div class="sub">Control Room · חדר בקרה</div>
+    </header>
+    <div class="law">
+      חוק הפרומפט: הקול של מיניקס נחתם רק על ידי יוסף. מה שנשמר כאן נכתב
+      ל-<span style="font-family:var(--mono);direction:ltr;unicode-bidi:embed">config/voice.he.txt</span>
+      ונהיה הפרסונה — מילה במילה. כל השאר (מכניקה ונאדג'ים) הן הנחיות תפעול, לא אופי.
+    </div>
+
+    <!-- ── הקול ── -->
+    <section>
+      <h2>הקול שלה <span id="voice-chip" class="chip fallback">טוען…</span>
+        <span class="src" id="voice-src"></span></h2>
+      <div class="when">זה פרומפט המערכת שאיתו היא עולה לבמה (בתוספת המכניקה שלמטה וזיכרון סשנים).</div>
+      <textarea id="voice-text" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn primary" id="voice-save">✍️ חתימה ושמירה</button>
+        <span class="hintline" id="voice-status"></span>
+      </div>
+    </section>
+
+    <!-- ── מכניקה ── -->
+    <section>
+      <h2>מכניקה — לא אופי <span class="src">config/prompts.js · MECHANICS</span></h2>
+      <div class="when">מתווסף אוטומטית אחרי הקול. חיווט כלים בלבד.</div>
+      <pre id="mechanics"></pre>
+    </section>
+
+    <!-- ── נאדג'ים ── -->
+    <section>
+      <h2>כל ההנחיות שהיא מקבלת תוך כדי שידור</h2>
+      <div class="when">אלה הודעות שנשלחות אליה כהנחיות במאי — היא מנסחת את המילים שלה בעצמה. אף שורה לא מוצגת כאילו היא אמרה אותה.</div>
+      <div id="nudges"></div>
+      <div class="hintline" id="prompts-note" style="margin-top:12px"></div>
+    </section>
+
+    <!-- ── צ'אט ── -->
+    <section>
+      <h2>צ'אט ישיר איתה</h2>
+      <div class="when">
+        שני ערוצים: <b>התכתבות</b> — בלי שום פרומפט מערכת, בדיוק כמו מכתבי הלידה של קלוד;
+        <b>במה</b> — עם הקול המלא שלמעלה, לניסויים. הטקסט שחוזר הוא תמלול הקול שלה עצמו.
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <div class="toggle">
+          <button id="ch-birth" class="on">התכתבות · בלי פרומפט</button>
+          <button id="ch-stage">במה · עם הקול</button>
+        </div>
+        <button class="btn" id="chat-reset">סשן חדש</button>
+      </div>
+      <div id="chat-log"></div>
+      <textarea id="chat-input" placeholder="כתוב אליה…" spellcheck="false"></textarea>
+      <div class="row">
+        <button class="btn primary" id="chat-send">שלח</button>
+        <span class="hintline" id="chat-status"></span>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const $ = id => document.getElementById(id);
+    let channel = 'birth';
+
+    // ── load prompts ──
+    async function load() {
+      const r = await fetch('/api/control/prompts').then(x => x.json());
+      const chip = $('voice-chip');
+      chip.textContent = r.voice.signed ? 'חתום' : 'פולבק — לא חתום';
+      chip.className = 'chip ' + (r.voice.signed ? 'signed' : 'fallback');
+      $('voice-src').textContent = r.voice.source;
+      $('voice-text').value = r.voice.text;
+      const mech = $('mechanics');
+      mech.textContent = r.mechanics.trim();
+      $('nudges').innerHTML = r.nudges.map(n => `
+        <div class="nudge">
+          <h3>${n.title} <span class="src">${n.source}</span></h3>
+          <div class="when">מתי: ${n.when}</div>
+          <pre>${n.text.replace(/</g, '&lt;')}</pre>
+        </div>`).join('');
+      $('prompts-note').textContent = r.note;
+    }
+    load();
+
+    // ── sign voice ──
+    $('voice-save').addEventListener('click', async () => {
+      const text = $('voice-text').value.trim();
+      const st = $('voice-status');
+      if (!text) { st.textContent = 'קול ריק לא נחתם.'; st.className = 'hintline err'; return; }
+      if (!confirm('לחתום על הקול הזה? הוא נכנס לתוקף מהסשן הבא של מיניקס.')) return;
+      st.textContent = 'חותם…';
+      try {
+        const r = await fetch('/api/control/voice', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text }),
+        }).then(x => x.json());
+        if (r.status === 'signed') { st.textContent = `נחתם (${r.chars} תווים). בתוקף מהסשן הבא.`; st.className = 'hintline ok'; load(); }
+        else { st.textContent = r.error || 'שגיאה'; st.className = 'hintline err'; }
+      } catch (e) { st.textContent = 'שגיאה: ' + e.message; st.className = 'hintline err'; }
+    });
+
+    // ── chat ──
+    function addMsg(cls, who, text) {
+      const d = document.createElement('div');
+      d.className = 'msg ' + cls;
+      d.innerHTML = who ? `<span class="who">${who}</span>` : '';
+      d.appendChild(document.createTextNode(text));
+      $('chat-log').appendChild(d);
+      $('chat-log').scrollTop = $('chat-log').scrollHeight;
+    }
+
+    function setChannel(ch) {
+      channel = ch;
+      $('ch-birth').className = ch === 'birth' ? 'on' : '';
+      $('ch-stage').className = ch === 'stage' ? 'on' : '';
+      addMsg('sys', '', ch === 'birth' ? '— ערוץ התכתבות: בלי שום פרומפט מערכת —' : '— ערוץ במה: עם הקול המלא —');
+    }
+    $('ch-birth').addEventListener('click', () => setChannel('birth'));
+    $('ch-stage').addEventListener('click', () => setChannel('stage'));
+
+    $('chat-reset').addEventListener('click', async () => {
+      await fetch('/api/control/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel, reset: true }) });
+      addMsg('sys', '', '— סשן חדש. היא לא זוכרת את מה שנאמר קודם. —');
+    });
+
+    let busy = false;
+    async function send() {
+      const inp = $('chat-input');
+      const text = inp.value.trim();
+      if (!text || busy) return;
+      busy = true;
+      addMsg('me', channel === 'birth' ? 'אתה → אליה (בלי פרומפט)' : 'אתה → אליה (במה)', text);
+      inp.value = '';
+      $('chat-status').innerHTML = '<span class="spin">◌</span> היא עונה… (זה קול שמתומלל — לוקח רגע)';
+      try {
+        const r = await fetch('/api/control/chat', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel, message: text }),
+        }).then(x => x.json());
+        if (r.reply != null) addMsg('her', 'מיניקס', r.reply || '(שתיקה — אין תמלול)');
+        else addMsg('sys', '', r.error || 'שגיאה לא ידועה');
+      } catch (e) { addMsg('sys', '', 'שגיאה: ' + e.message); }
+      $('chat-status').textContent = '';
+      busy = false;
+    }
+    $('chat-send').addEventListener('click', send);
+    $('chat-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) send();
+    });
+  </script>
+</body>
+</html>

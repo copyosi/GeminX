@@ -90,4 +90,8 @@ if (fs.existsSync(VOICE_FILE)) {
   console.warn('[prompts] ⚠ config/voice.he.txt missing — running on FALLBACK voice (not signed)');
 }
 
-module.exports = { MINI, MINI_LOCKON, MINI_ROAST, MINI_DEFENSE, MINI_BUILD, MINI_CREDITS };
+module.exports = {
+  MINI, MINI_LOCKON, MINI_ROAST, MINI_DEFENSE, MINI_BUILD, MINI_CREDITS,
+  // Control-room introspection (Yosef 22.7): the exact pieces, no copies.
+  MECHANICS, FALLBACK, VOICE_FILE,
+};
